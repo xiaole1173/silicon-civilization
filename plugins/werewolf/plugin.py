@@ -171,7 +171,7 @@ class WerewolfPlugin(BaseScenario):
 
             guard_target = None
             if st.alive_of("guard"):
-                rnd = session.open_round("守卫行动", "第 {} 夜".format(st.day))
+                rnd = session.open_round("守卫行动", "第 {} 夜".format(st.day), kind="secret")
                 for seat in st.alive_of("guard"):
                     action = self._act(session, seat, "night_guard",
                                        "决定今晚守谁（不能连守同一人）。", round_id=rnd["id"])
@@ -180,7 +180,8 @@ class WerewolfPlugin(BaseScenario):
                 session.close_round(rnd, "守 {} 号".format(guard_target) if guard_target else "没有守护")
 
             if (sc.wolf_discussion or {}).get("enabled", True):
-                rnd = session.open_round("狼队密谋", "第 {} 夜".format(st.day), channel="wolves")
+                rnd = session.open_round("狼队密谋", "第 {} 夜".format(st.day),
+                                         channel="wolves", kind="wolves")
                 for r2 in range(1, int((sc.wolf_discussion or {}).get("rounds", 1)) + 1):
                     for seat in sorted(st.alive_wolves()):
                         self._act(session, seat, "wolf_speak",
@@ -188,7 +189,7 @@ class WerewolfPlugin(BaseScenario):
                                   channel="wolves", round_id=rnd["id"])
                 session.close_round(rnd)
 
-            rnd = session.open_round("狼人猎杀", "第 {} 夜".format(st.day))
+            rnd = session.open_round("狼人猎杀", "第 {} 夜".format(st.day), kind="secret")
             wolf_votes = {}
             for seat in st.alive_wolves():
                 action = self._act(session, seat, "night_wolf", "决定今晚带走谁。", round_id=rnd["id"])
@@ -199,7 +200,7 @@ class WerewolfPlugin(BaseScenario):
             session.close_round(rnd, "目标 {} 号".format(wolf_target) if wolf_target else "没有目标")
 
             if st.alive_of("seer"):
-                rnd = session.open_round("预言家查验", "第 {} 夜".format(st.day))
+                rnd = session.open_round("预言家查验", "第 {} 夜".format(st.day), kind="secret")
                 for seat in st.alive_of("seer"):
                     action = self._act(session, seat, "night_seer",
                                        "选择一人查验身份。", round_id=rnd["id"])
@@ -215,7 +216,7 @@ class WerewolfPlugin(BaseScenario):
 
             witch_action = {"kind": "pass"}
             if st.alive_of("witch"):
-                rnd = session.open_round("女巫用药", "第 {} 夜".format(st.day))
+                rnd = session.open_round("女巫用药", "第 {} 夜".format(st.day), kind="secret")
                 for seat in st.alive_of("witch"):
                     witch_action = self._act(session, seat, "night_witch",
                                              "是否用药（救命/致命各一瓶）。", round_id=rnd["id"])
@@ -319,34 +320,108 @@ class WerewolfPlugin(BaseScenario):
 
     # ---------- 警长 ----------
     def _elect_sheriff(self, session) -> None:
+        """官方流程：上警 → 警上发言 → 可退水 → 警下投票 → 平票 PK 再投。"""
         st = self._state(session)
         conf = self._scenario(session).sheriff or {}
-        rnd = session.open_round("警长竞选", "第 1 天", kind="vote")
-        votes = {}
+
+        # ① 上警
+        rnd = session.open_round("上警", "第 1 天 · 警长竞选", kind="vote")
+        candidates = []
         for seat in sorted(st.alive):
-            action = self._act(session, seat, "sheriff_vote", "选出你信任的警长。",
+            action = self._act(session, seat, "sheriff_run", "你要不要上警竞选警长？",
                                round_id=rnd["id"])
+            if action.get("kind") == "run":
+                candidates.append(seat)
+        session.close_round(rnd, "上警：{}".format(
+            "、".join("{} 号".format(c) for c in candidates) or "无人上警"))
+        if not candidates:
+            session.referee("无人上警，本局没有警长。")
+            return
+        session.referee("上警的是 {} 号。".format("、".join(str(c) for c in candidates)))
+        st.meta["sheriff_candidates"] = list(candidates)
+
+        # ② 竞选发言
+        rnd = session.open_round("竞选发言", "第 1 天", channel="public")
+        for seat in candidates:
+            if seat not in st.alive:
+                continue
+            self._act(session, seat, "sheriff_campaign_speak",
+                      "你是警上玩家，向警下说明你当警长后会怎么做。", round_id=rnd["id"])
+        session.close_round(rnd)
+
+        # ③ 退水
+        rnd = session.open_round("退水", "第 1 天", kind="vote")
+        for seat in list(candidates):
+            if seat not in st.alive:
+                candidates.remove(seat)
+                continue
+            action = self._act(session, seat, "sheriff_withdraw", "要不要退水？",
+                               round_id=rnd["id"])
+            if action.get("kind") == "withdraw":
+                candidates.remove(seat)
+        session.close_round(rnd, "候选人：{}".format(
+            "、".join("{} 号".format(c) for c in candidates) or "全部退水"))
+        if not candidates:
+            session.referee("全部退水，本局没有警长。")
+            return
+        if len(candidates) == 1:
+            st.sheriff = candidates[0]
+            self._sync_alive(session)
+            session.referee("只有 {} 号一人上警未退水，自动当选警长（票权 {}）。".format(
+                st.sheriff, conf.get("vote_weight", 1.5)))
+            return
+
+        # ④ 警下投票（平票则 PK 再投）
+        st.meta["sheriff_candidates"] = list(candidates)
+        winner = self._sheriff_ballot(session, candidates, "警下投票")
+        if winner is None:
+            return
+        if winner == "tie":
+            top = st.meta.pop("sheriff_pk", [])
+            session.referee("平票：{} 号，进入 PK 发言。".format("、".join(str(t) for t in top)))
+            rnd_pk = session.open_round("PK 发言", "第 1 天")
+            for seat in top:
+                if seat in st.alive:
+                    self._act(session, seat, "sheriff_campaign_speak",
+                              "你和他人平票，请做 PK 发言。", round_id=rnd_pk["id"])
+            session.close_round(rnd_pk)
+            winner = self._sheriff_ballot(session, top, "PK 重投")
+            if winner is None:
+                return
+            if winner == "tie":
+                session.referee("再次平票，本局没有警长。")
+                return
+        st.sheriff = winner
+        self._sync_alive(session)
+        session.referee("{} 号当选警长（票权 {}）。".format(winner, conf.get("vote_weight", 1.5)))
+
+    def _sheriff_ballot(self, session, candidates, title: str):
+        """警下玩家投票。返回座位号 / "tie" / None（票数不足）。"""
+        st = self._state(session)
+        rnd = session.open_round(title, "第 1 天", kind="vote")
+        votes = {}
+        for seat in sorted(st.alive - set(candidates)):
+            action = self._act(session, seat, "sheriff_vote", "只能投给候选人。", round_id=rnd["id"])
             target = self._as_target(action) if action.get("kind") == "vote" else None
-            if target == seat or target not in st.alive:
+            if target not in candidates:
                 target = None
             votes[seat] = target
         result = rules.tally_votes(votes)
         detail = "，".join("{} 号 {} 票".format(s, int(v) if v == int(v) else v)
                           for s, v in sorted(result["tally"].items(), key=lambda kv: (-kv[1], kv[0])))
-        if not result["top"] or result["tie"]:
-            session.close_round(rnd, "平票，本局没有警长（{}）".format(detail or "全员弃权"))
-            session.referee("警长竞选平票，本局没有警长。")
-            return
-        st.sheriff = result["top"][0]
-        self._sync_alive(session)
-        session.close_round(rnd, "{} 号当选（{}）".format(st.sheriff, detail))
-        session.referee("{} 号当选警长（票权 {}）。".format(
-            st.sheriff, conf.get("vote_weight", 1.5)))
+        session.close_round(rnd, detail or "全员弃权")
+        if not result["top"]:
+            session.referee("警下没有人投票，本局没有警长。")
+            return None
+        if result["tie"]:
+            st.meta["sheriff_pk"] = list(result["top"])
+            return "tie"
+        return result["top"][0]
 
     # ---------- 自爆 ----------
     def _try_self_destruct(self, session) -> bool:
         st = self._state(session)
-        rnd = session.open_round("自爆声明", "第 {} 天".format(st.day))
+        rnd = session.open_round("自爆声明", "第 {} 天".format(st.day), kind="secret")
         for seat in sorted(st.alive_wolves()):
             action = self._act(session, seat, "wolf_destruct", "要不要现在自爆？", round_id=rnd["id"])
             if action.get("kind") != "destruct":
@@ -374,7 +449,7 @@ class WerewolfPlugin(BaseScenario):
         if seat in st.alive:
             return
         if rules.can_hunter_shoot(st, seat, cause):
-            rnd = session.open_round("猎人开枪", "{} 号出局".format(seat))
+            rnd = session.open_round("猎人开枪", "{} 号出局".format(seat), kind="secret")
             action = self._act(session, seat, "hunter", "你已出局，可以开枪带走一人。", round_id=rnd["id"])
             shot = self._pick_target(session, seat, action) if action.get("kind") == "shoot" else None
             session.close_round(rnd, "带走 {} 号".format(shot) if shot else "没有开枪")
@@ -384,7 +459,7 @@ class WerewolfPlugin(BaseScenario):
                 self._death_trigger(session, shot, "hunter")
         elif rules.can_wolf_king_shoot(st, seat, cause):
             label = self._label(session, st.role_of(seat))
-            rnd = session.open_round("{}反制".format(label), "{} 号出局".format(seat))
+            rnd = session.open_round("{}反制".format(label), "{} 号出局".format(seat), kind="secret")
             action = self._act(session, seat, "wolf_king", "你是{}，可以开枪。".format(label),
                                round_id=rnd["id"])
             shot = self._pick_target(session, seat, action) if action.get("kind") == "shoot" else None
@@ -400,7 +475,7 @@ class WerewolfPlugin(BaseScenario):
     def _handle_badge(self, session, seat: int) -> None:
         st = self._state(session)
         st.sheriff = None
-        rnd = session.open_round("警徽移交", "{} 号出局".format(seat))
+        rnd = session.open_round("警徽移交", "{} 号出局".format(seat), kind="vote")
         action = self._act(session, seat, "badge", "你是警长，已出局，可以把警徽交给一个活人。",
                            round_id=rnd["id"])
         target = self._as_target(action) if action.get("kind") == "pass_badge" else None
@@ -510,6 +585,9 @@ class WerewolfPlugin(BaseScenario):
                           validator=self._validator(context), retries=1,
                           label=context, round_id=round_id)
         raw = (msg.text if msg else "") or ""
+        if msg is not None and (msg.meta or {}).get("ok") is False:
+            session.referee("{} 号调用失败：{}".format(
+                seat, (msg.meta or {}).get("error", "未知错误")), public=False)
         action = ep.parse_action(raw)
         if not action:
             action = {"kind": "abstain"} if context == "day_vote" else {"kind": "pass"}

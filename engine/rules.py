@@ -119,11 +119,35 @@ def validate_action(state: GameState, seat: int, action: dict, *, context: str) 
             return _check_target(state, action, seat, allow_self=False, context="女巫毒药")
         return True, ""
 
+    if context == "sheriff_run":
+        if kind not in ("run", "pass"):
+            return False, "上警阶段只能 run 或 pass"
+        return True, ""
+
+    if context == "sheriff_campaign_speak":
+        if kind not in ("speak", "pass"):
+            return False, "竞选发言只能 speak 或 pass"
+        return True, ""
+
+    if context == "sheriff_withdraw":
+        if kind not in ("withdraw", "stay"):
+            return False, "退水阶段只能 withdraw 或 stay"
+        return True, ""
+
     if context == "sheriff_vote":
+        candidates = list(state.meta.get("sheriff_candidates") or [])
+        if seat in candidates:
+            return False, "警上玩家不参与警长投票"
         if kind not in ("vote", "abstain"):
             return False, "警长竞选只能 vote 或 abstain"
         if kind == "vote":
-            return _check_target(state, action, seat, allow_self=False, context="警长投票")
+            try:
+                target = int(action.get("target"))
+            except (TypeError, ValueError):
+                return False, "警长投票必须指定候选人"
+            if target not in candidates:
+                return False, "只能投给上警的候选人：{}".format(
+                    "、".join(str(c) for c in candidates))
         return True, ""
 
     if context == "wolf_destruct":

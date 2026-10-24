@@ -64,13 +64,18 @@
 
   /* 回合卡 */
   .round{border:1px solid var(--line);border-radius:12px;background:var(--panel);
-    margin:12px 0;overflow:hidden}
+    margin:16px 0;overflow:hidden}
   .round-head{display:flex;align-items:center;gap:9px;padding:8px 13px;
     background:#fbfcfe;border-bottom:1px solid var(--line)}
   .round-head .rt{font-size:13px;font-weight:650}
   .round-head .rs{font-size:11.5px;color:var(--muted)}
   .round-head .rx{margin-left:auto;font-size:11.5px;color:#3b6fe0;font-variant-numeric:tabular-nums}
   .round-body{padding:10px 13px}
+  .round{box-shadow:0 1px 3px rgba(18,24,38,.04)}
+  .round.secret{border-color:#dfe6f2;background:#fcfdff}
+  .round.secret .round-head{background:#f3f7fd}
+  .round.secret .rt{color:#2f5a96}
+  .round.public{border-color:var(--line)}
   .round.wolves{border-color:#e6dcf7}
   .round.wolves .round-head{background:#faf7ff}
   .round.wolves .rt{color:#6b3fa0}
@@ -89,6 +94,16 @@
   .itext{margin-top:2px;white-space:pre-wrap;word-break:break-word;font-size:13px;color:#2a2f38}
   .votes{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
   .round.votebox .round-body{padding:8px 13px}
+  .chbadge{font-size:10.5px;padding:1px 7px;border-radius:999px;background:#eef1f6;color:#5b6472}
+  .chbadge.wolves{background:#f3ecff;color:#6b3fa0}
+  .chbadge.secret{background:#e9f0fb;color:#2f5a96}
+  .chbadge.vote{background:#eaf7ef;color:#1e7e45}
+  .chbadge.public{background:#f1f3f7;color:#6b7280}
+  .vthink{margin-top:7px;border-top:1px dashed #eef1f5;padding-top:6px}
+  .vt{font-size:11.5px;color:var(--think);white-space:pre-wrap;margin:3px 0;
+    max-height:120px;overflow:auto}
+  button.tiny{font-size:11px;padding:1px 8px;border-radius:999px;color:#6b7280}
+  .fail{font-size:11.5px;color:#b4271c;margin-top:3px}
   .vchip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:2px 8px;
     border-radius:999px;background:#f1f4f9;color:#4a5464}
   .vchip b{font-variant-numeric:tabular-nums}
@@ -190,7 +205,7 @@
 
 <script>
 var S = { plugins: [], models: [], sessions: [], cur: null, es: null,
-          msgs: {}, rounds: {}, agents: {}, stick: true, retry: 0,
+          msgs: {}, rounds: {}, roundMeta: {}, agents: {}, stick: true, retry: 0,
           alive: null, sheriff: null, revealed: [] };
 
 function $(id){ return document.getElementById(id); }
@@ -243,6 +258,24 @@ function createRound(rnd){
     '<div class="round-body"></div>';
   box.querySelector(".rt").textContent = rnd.title || "";
   box.querySelector(".rs").textContent = rnd.subtitle || "";
+  var badge = { wolves: "狼队频道", secret: "私密 · 仅观察者", vote: "计票", public: "公开" }[rnd.kind || ""];
+  if (badge){
+    var b = document.createElement("span");
+    b.className = "chbadge " + (rnd.kind || "");
+    b.textContent = badge;
+    box.querySelector(".round-head").insertBefore(b, box.querySelector(".rs"));
+  }
+  if (rnd.kind === "vote"){
+    var tb = document.createElement("button");
+    tb.className = "tiny";
+    tb.textContent = "思考";
+    tb.onclick = function(){
+      var vt = S.rounds[rnd.id] && S.rounds[rnd.id].vthink;
+      if (!vt) return;
+      vt.style.display = vt.style.display === "none" ? "block" : "none";
+    };
+    box.querySelector(".round-head").insertBefore(tb, box.querySelector(".rx"));
+  }
   $("stream").appendChild(box);
   var obj = { root: box, body: box.querySelector(".round-body"),
               summary: box.querySelector(".rx"), items: {}, kind: rnd.kind || "group",
@@ -251,9 +284,20 @@ function createRound(rnd){
   scrollBottom();
   return obj;
 }
+var KIND_BY_TITLE = {
+  "狼队密谋":"wolves", "狼人猎杀":"secret", "预言家查验":"secret", "女巫用药":"secret",
+  "守卫行动":"secret", "猎人开枪":"secret", "白狼王反制":"secret", "狼王反制":"secret",
+  "自爆声明":"secret",
+  "警长竞选":"vote", "上警":"vote", "退水":"vote", "警下投票":"vote", "PK 重投":"vote",
+  "平票重投":"vote", "全体表决":"vote", "警徽移交":"vote",
+  "白天陈述":"public", "遗言":"public", "竞选发言":"public", "PK 发言":"public"
+};
 function ensureRound(id, meta){
   if (!id) return null;
-  return S.rounds[id] || createRound(meta || { id:id, title:"" });
+  if (S.rounds[id]) return S.rounds[id];
+  var info = meta || S.roundMeta[id] || { id: id, title: "" };
+  if (!info.kind && KIND_BY_TITLE[info.title]) info = Object.assign({}, info, { kind: KIND_BY_TITLE[info.title] });
+  return createRound(info);
 }
 
 var CHIP = { kill:{c:"kill",l:"刀"}, check:{c:"check",l:"查"}, poison:{c:"poison",l:"毒"},
@@ -300,6 +344,10 @@ function addVote(rd, m){
     rd.votes = document.createElement("div");
     rd.votes.className = "votes";
     rd.body.appendChild(rd.votes);
+    rd.vthink = document.createElement("div");
+    rd.vthink.className = "vthink";
+    rd.vthink.style.display = "none";
+    rd.body.appendChild(rd.vthink);
   }
   var chip = document.createElement("span");
   chip.className = "vchip";
@@ -309,7 +357,8 @@ function addVote(rd, m){
   rd.votes.appendChild(chip);
   var node = { root: chip, text: chip.querySelector(".c"), body: rd.votes,
                think: document.createElement("span"), thinkBox: {style:{}, open:false},
-               lat: document.createElement("span") };
+               lat: document.createElement("span"), round: rd, sender: m.sender,
+               senderName: m.sender_name };
   S.msgs[m.id] = node;
   return node;
 }
@@ -327,8 +376,15 @@ function finalize(node, text, thinking, meta){
   if (!node) return;
   var isVote = node.root && node.root.className === "vchip";
   if (isVote){
+    if (thinking && thinking.trim() && node.round && node.round.vthink){
+      var t = document.createElement("div");
+      t.className = "vt";
+      t.innerHTML = '<b>' + esc(node.senderName || node.sender) + '</b>：';
+      t.appendChild(document.createTextNode(thinking.trim()));
+      node.round.vthink.appendChild(t);
+    }
     var a = (meta && meta.action) || {};
-    if (a.kind === "vote" && a.target){
+    if (a.target){
       node.text.textContent = "→ " + a.target;
     } else if (a.kind === "vote" || a.kind === "abstain"){
       node.text.textContent = "弃权";
@@ -394,6 +450,7 @@ function handleEvent(e){
     $("pluginName").textContent = e.scenario || "—";
     (e.agents || []).forEach(function(a){ S.agents[a.id] = a; });
     S.alive = e.alive || null; S.sheriff = e.sheriff; S.revealed = e.revealed || [];
+    (e.rounds || []).forEach(function(r){ S.roundMeta[r.id] = r; });
     renderMembers(); setState(e.state, e.winner);
     return;
   }
@@ -435,6 +492,12 @@ function handleEvent(e){
       if (who) who.insertAdjacentHTML("afterend", '<span class="role">' + esc(e.meta.role) + '</span>');
     }
     if (e.meta && e.meta.usage) node.usage = e.meta.usage;
+    if (e.meta && e.meta.ok === false){
+      var f = document.createElement("div");
+      f.className = "fail";
+      f.textContent = "调用失败：" + (e.meta.error || "未知错误");
+      node.body.appendChild(f);
+    }
     if (e.meta && e.meta.rejections && e.meta.rejections.length){
       var err = document.createElement("div");
       err.className = "errline";
@@ -463,7 +526,7 @@ function handleEvent(e){
 /* ---------- 连接 ---------- */
 function attach(sid){
   if (S.es){ S.es.close(); S.es = null; }
-  S.cur = sid; S.msgs = {}; S.rounds = {}; S.agents = {}; S.retry = 0; S.stick = true;
+  S.cur = sid; S.msgs = {}; S.rounds = {}; S.roundMeta = {}; S.agents = {}; S.retry = 0; S.stick = true;
   $("stream").innerHTML = ""; banner(""); loadSessions();
   api("/api/sessions/" + encodeURIComponent(sid)).then(function(d){
     if (!d.ok){ banner("这个会话已经不在了（服务重启过，内存会话会丢失）。"); return; }
@@ -482,7 +545,7 @@ function attach(sid){
 }
 
 function attachStatic(sid){
-  S.cur = sid; S.msgs = {}; S.rounds = {}; S.agents = {};
+  S.cur = sid; S.msgs = {}; S.rounds = {}; S.roundMeta = {}; S.agents = {};
   $("stream").innerHTML = "";
   return api("/api/sessions/" + encodeURIComponent(sid)).then(function(d){
     if (!d.ok){ $("stream").innerHTML = '<div class="hint">会话不存在</div>'; return; }
@@ -496,7 +559,13 @@ function attachStatic(sid){
     (s.messages || []).forEach(function(m){
       if (m.kind === "referee" || m.kind === "system"){ addReferee(m); return; }
       var rid = (m.meta && m.meta.round) || null;
-      if (rid && !S.rounds[rid]) createRound(rounds[rid] || { id:rid, title:"" });
+      if (rid){
+        S.roundMeta[rid] = rounds[rid] || S.roundMeta[rid] || { id: rid, title: "" };
+        if (!S.rounds[rid] && KIND_BY_TITLE[S.roundMeta[rid].title]){
+          S.roundMeta[rid] = Object.assign({}, S.roundMeta[rid], { kind: KIND_BY_TITLE[S.roundMeta[rid].title] });
+        }
+        ensureRound(rid);
+      }
       var node = addItem(rid, m);
       finalize(node, m.text, m.thinking, m.meta);
       if (m.meta && m.meta.role && node && !node.root.querySelector(".role")){
