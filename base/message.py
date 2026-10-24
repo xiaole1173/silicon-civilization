@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 
 PUBLIC = "public"
+OBSERVER = "meta"      # 只有观察者能看到，模型看不到（防信息泄漏）
 
 
 @dataclass

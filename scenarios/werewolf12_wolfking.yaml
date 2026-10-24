@@ -64,7 +64,7 @@ vote:
   simultaneous: true
   quorum: above_abstain
   tie: revote_once
-  reveal_role_on_exit: true
+  reveal_role_on_exit: false   # 官方标准场是暗牌局：出局不翻身份
 
 last_words:
   enabled: true

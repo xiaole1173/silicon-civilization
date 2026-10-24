@@ -148,9 +148,12 @@ class WerewolfPlugin(BaseScenario):
         session.add_channel("wolves", "狼队密聊", subscribers=wolves)
         session.add_channel("dead", "遗言", subscribers=[])
 
+        # 身份表只给观察者看，绝不进入公共频道（否则模型会直接读到）
         layout = "、".join("{}号={}".format(s, self._role_label(session, r))
                           for s, r in sorted(state.seat_roles.items()))
-        session.narrate("开局（{}，seed {}）：{}".format(scenario.theme.get("name", "本局"), seed, layout))
+        session.narrate("开局：{} · {} 人（seed {}）".format(
+            scenario.theme.get("name", "本局"), scenario.players, seed))
+        session.narrate_private("身份表（仅观察者可见）：" + layout)
 
     # ---------- 主循环 ----------
     def run(self, session) -> None:
@@ -194,8 +197,7 @@ class WerewolfPlugin(BaseScenario):
             wolf_target, detail = rules.resolve_wolf_votes(wolf_votes)
             st.meta["pending_wolf_target"] = wolf_target
             if wolf_target:
-                session.narrate("狼队的目标：{}号（{}）".format(
-                    wolf_target, "多数决" if detail.get("rule") == "majority_lowest_seat" else detail.get("rule")))
+                session.narrate_private("狼队目标：{}号".format(wolf_target))
 
             # 预言家
             for seat in st.alive_of("seer"):
@@ -206,7 +208,8 @@ class WerewolfPlugin(BaseScenario):
                 is_wolf = st.role_of(target) == "werewolf"
                 st.private.setdefault(seat, {}).setdefault("seer", []).append(
                     {"day": st.day, "target": target, "is_wolf": is_wolf})
-                session.narrate("（{}号查验了 {}号）".format(seat, target), channel="private")
+                session.narrate_private("{}号查验 {}号 → {}".format(
+                    seat, target, "狼" if is_wolf else "好人"))
 
             # 女巫
             witch_action = {"kind": "pass"}
@@ -228,9 +231,13 @@ class WerewolfPlugin(BaseScenario):
                 tags.append("女巫用毒")
             if night.get("same_night_rescue"):
                 tags.append("同守同救")
-            session.narrate("夜晚结算：{}".format(
-                "、".join("{}号（{}）".format(d["seat"], self._role_label(session, d["role"]))
-                         for d in deaths) or "平安夜") + ("｜" + "，".join(tags) if tags else ""))
+            session.narrate("天亮了：" + ("{} 号出局".format(
+                "、".join(str(d["seat"]) for d in deaths)) if deaths else "平安夜"))
+            session.narrate_private("夜里结算：{}｜{}｜死因 {}".format(
+                "、".join("{}号({})".format(d["seat"], self._role_label(session, d["role"]))
+                         for d in deaths) or "无",
+                "，".join(tags) or "无触发",
+                "，".join("{}号={}".format(d["seat"], d["cause"]) for d in deaths) or "无"))
 
             # 猎人
             for d in list(deaths):
@@ -271,9 +278,12 @@ class WerewolfPlugin(BaseScenario):
                     session.narrate("{}号翻牌——是白痴，免于出局，此后失去投票权".format(eliminated))
                     eliminated = None
             if eliminated:
+                role_text = self._role_label(session, st.role_of(eliminated))
                 rules.apply_deaths(st, [{"seat": eliminated, "cause": "vote"}])
-                session.narrate("{}号被逐出（身份：{}）".format(
-                    eliminated, self._role_label(session, st.role_of(eliminated))))
+                reveal = bool((sc.vote or {}).get("reveal_role_on_exit", False))
+                session.narrate("{}号被逐出{}".format(
+                    eliminated, "（身份：{}）".format(role_text) if reveal else ""))
+                session.narrate_private("{}号身份：{}".format(eliminated, role_text))
                 self._death_trigger(session, eliminated, "vote")
                 if (sc.last_words or {}).get("after_vote", True):
                     self._act(session, eliminated, "last_words",
@@ -354,15 +364,17 @@ class WerewolfPlugin(BaseScenario):
                 role = st.role_of(seat)
                 rules.apply_deaths(st, [{"seat": seat, "cause": "destruct"}])
                 if role == "white_wolf_king":
-                    session.narrate("{}号白狼王自爆！当天不再陈述与投票，直接进入黑夜".format(seat))
+                    session.narrate("{}号自爆，带走了一人；当天不再陈述与投票，直接进入黑夜".format(seat))
+                    session.narrate_private("{}号身份：{}".format(seat, self._role_label(session, role)))
                     take = self._act(session, seat, "wolf_king", "你自爆了，可以带走一个人。")
                     victim = self._pick_target(session, seat, take) if take.get("kind") == "shoot" else None
                     if victim is not None:
                         rules.apply_deaths(st, [{"seat": victim, "cause": "destruct"}])
-                        session.narrate("白狼王带走 {}号".format(victim))
+                        session.narrate("{}号随自爆出局".format(victim))
                         self._death_trigger(session, victim, "destruct")
                 else:
-                    session.narrate("{}号狼人自爆！当天不再陈述与投票，直接进入黑夜".format(seat))
+                    session.narrate("{}号自爆；当天不再陈述与投票，直接进入黑夜".format(seat))
+                    session.narrate_private("{}号身份：{}".format(seat, self._role_label(session, role)))
                 return True
         return False
 
@@ -376,7 +388,7 @@ class WerewolfPlugin(BaseScenario):
             shot = self._pick_target(session, seat, action) if action.get("kind") == "shoot" else None
             if shot is not None:
                 rules.apply_deaths(st, [{"seat": shot, "cause": "hunter"}])
-                session.narrate("猎人 {}号 开枪带走 {}号".format(seat, shot))
+                session.narrate("{}号出局时带走了 {}号".format(seat, shot))
                 self._death_trigger(session, shot, "hunter")
         elif rules.can_wolf_king_shoot(st, seat, cause):
             king_label = self._role_label(session, st.role_of(seat))
@@ -384,7 +396,7 @@ class WerewolfPlugin(BaseScenario):
             shot = self._pick_target(session, seat, action) if action.get("kind") == "shoot" else None
             if shot is not None:
                 rules.apply_deaths(st, [{"seat": shot, "cause": "hunter"}])
-                session.narrate("{} {}号 开枪带走 {}号".format(king_label, seat, shot))
+                session.narrate("{}号出局时带走了 {}号".format(seat, shot))
                 self._death_trigger(session, shot, "hunter")
 
         # 警徽流：警长出局则移交（放在技能之后，避免警徽跟着死）
@@ -450,9 +462,13 @@ class WerewolfPlugin(BaseScenario):
 
     def _sync_alive(self, session) -> None:
         st = self._state(session)
+        before = (tuple(session.meta.get("alive") or ()), session.meta.get("sheriff"))
         session.meta["alive"] = sorted(st.alive)
         session.meta["sheriff"] = st.sheriff
         session.meta["revealed"] = sorted(st.revealed)
+        after = (tuple(session.meta["alive"]), st.sheriff)
+        if before != after:
+            session.publish_state()
 
     def _act(self, session, seat: int, context: str, instruction: str,
              channel: str = "public") -> dict:
@@ -485,7 +501,10 @@ class WerewolfPlugin(BaseScenario):
                 msg.kind = "action"
             msg.meta = dict(msg.meta or {})
             msg.meta["action"] = action
-            msg._render_cache = None
+            msg.meta["role"] = self._role_label(session, st.role_of(seat))
+            msg.meta["seat"] = seat
+            # 后处理改写了正文：重新广播一次，前端才能显示人话而不是 JSON
+            session.patch_message(msg)
         return action
 
     @staticmethod

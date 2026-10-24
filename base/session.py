@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "server"))
 
 import providers  # noqa: E402
 
-from base.message import PUBLIC, Channel, Message  # noqa: E402
+from base.message import OBSERVER, PUBLIC, Channel, Message  # noqa: E402
 from base.streaming import Broker  # noqa: E402
 
 
@@ -50,7 +50,10 @@ class Session:
         self.config = dict(config or {})
         self.budget_chars = budget_chars
         self.agents: dict[int, Agent] = {}
-        self.channels: dict[str, Channel] = {PUBLIC: Channel(PUBLIC, "公共频道")}
+        self.channels: dict[str, Channel] = {
+            PUBLIC: Channel(PUBLIC, "公共频道"),
+            OBSERVER: Channel(OBSERVER, "观察者"),
+        }
         self.messages: list[Message] = []
         self.broker = Broker()
         self.state = "created"
@@ -196,6 +199,22 @@ class Session:
     def narrate(self, text: str, channel: str = PUBLIC) -> Message:
         return self.add_message(channel, None, kind="system", text=text)
 
+    def narrate_private(self, text: str) -> Message:
+        """观察者可见、模型不可见的旁白（身份、结算细节等，防泄漏）。"""
+        return self.add_message(OBSERVER, None, kind="system", text=text)
+
+    def publish_state(self) -> None:
+        """把存活/警长等对局状态推给观察者（模型看不到，只用于界面）。"""
+        self._publish({"type": "state", "alive": self.alive_ids(),
+                       "sheriff": self.meta.get("sheriff"),
+                       "revealed": self.meta.get("revealed") or []})
+
+    def patch_message(self, msg: Message) -> None:
+        """消息内容被后处理改写后，重新广播一次终态（前端据此替换原文）。"""
+        msg._render_cache = None
+        self._publish({"type": "message_end", "id": msg.id, "text": msg.text,
+                       "thinking": msg.thinking, "meta": msg.meta})
+
     def end(self, winner=None) -> None:
         self.state = "ended"
         self.winner = winner
@@ -210,6 +229,9 @@ class Session:
             "channels": [{"name": c.name, "title": c.title} for c in self.channels.values()],
             "agents": [{"id": a.id, "name": a.name,
                         "model": a.model_conf.get("model", "")} for a in self.agents.values()],
+            "alive": self.alive_ids(),
+            "sheriff": self.meta.get("sheriff"),
+            "revealed": self.meta.get("revealed") or [],
             "messages": [m.to_dict() for m in self.messages],
             "config": self.config,
         }

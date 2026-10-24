@@ -12,7 +12,7 @@
     --ok:#1e7e45; --err:#c0392b;
   }
   *{box-sizing:border-box}
-  html,body{height:100%}
+  html,body{height:100%;overflow:hidden}
   body{margin:0;background:var(--bg);color:var(--ink);
     font:14px/1.6 "Segoe UI","Microsoft YaHei",system-ui,-apple-system,sans-serif;}
   button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:10px;
@@ -34,7 +34,8 @@
   .pill b{color:var(--ink);font-weight:600}
   .spacer{flex:1}
 
-  main{display:grid;grid-template-columns:250px minmax(0,1fr) 240px;gap:0;height:calc(100vh - 56px)}
+  main{display:grid;grid-template-columns:250px minmax(0,1fr) 260px;gap:0;
+    height:calc(100vh - 56px);overflow:hidden}
 
   /* 左栏 */
   #left{border-right:1px solid var(--line);background:var(--panel);padding:14px;overflow:auto}
@@ -47,7 +48,7 @@
   .sess .s{font-size:11.5px;color:var(--muted)}
 
   /* 中栏 */
-  #chat{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+  #chat{display:flex;flex-direction:column;min-width:0;background:var(--bg);overflow:hidden}
   #stream{flex:1;overflow:auto;padding:22px 26px 40px}
   .dayline{display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--muted);font-size:12px}
   .dayline::before,.dayline::after{content:"";height:1px;background:var(--line);flex:1}
@@ -58,12 +59,23 @@
   .body{min-width:0;flex:1}
   .head{display:flex;align-items:baseline;gap:8px;margin-bottom:3px}
   .who{font-weight:650;font-size:13px}
+  .role{font-size:11px;padding:0 6px;border-radius:6px;background:#eef3fe;color:#3b6fe0}
+  .mdl{font-size:11px;color:#9aa2b1}
   .meta{font-size:11.5px;color:var(--muted)}
   .bubble{background:var(--panel);border:1px solid var(--line);border-radius:12px;
     padding:9px 12px;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 2px rgba(18,24,38,.03)}
   .msg.thinking-now .bubble{border-color:#cfdcf8}
-  .msg.act-msg .bubble{background:#fafbfd;color:var(--muted);font-size:12.5px;
-    border-style:dashed;box-shadow:none}
+  .msg.act-msg .bubble{background:#fafbfd;color:#5b6472;font-size:12.5px;
+    border-style:dashed;box-shadow:none;display:inline-flex;align-items:center;gap:6px}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:12px;
+    padding:1px 8px;border-radius:999px;background:#eef1f6;color:#49536a}
+  .chip.kill{background:#fdecea;color:#b4271c}
+  .chip.check{background:#eaf3ff;color:#2257a8}
+  .chip.poison{background:#f3ecff;color:#6b3fa0}
+  .chip.vote{background:#eaf7ef;color:#1e7e45}
+  .chip.badge{background:#fff5e5;color:#9a6212}
+  .dead .ava{filter:grayscale(1);opacity:.45}
+  .member.out .nm{text-decoration:line-through;color:#a7aeb9}
   .sys{max-width:760px;margin:10px 0;font-size:12.5px;color:var(--muted);
     display:flex;align-items:center;gap:8px}
   .sys::before{content:"";width:3px;height:14px;border-radius:2px;background:#d8dee9}
@@ -85,7 +97,7 @@
   /* 右栏 */
   #right{border-left:1px solid var(--line);background:var(--panel);padding:14px;overflow:auto}
   #right h2{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 8px;letter-spacing:.4px}
-  .member{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed #f0f2f6}
+  .member{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dashed #f0f2f6}
   .member:last-child{border-bottom:0}
   .member .nm{font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .member .md{font-size:11px;color:var(--muted);max-width:96px;overflow:hidden;
@@ -170,7 +182,8 @@
 
 <script>
 var S = { plugins: [], models: [], sessions: [], cur: null, es: null,
-          msgs: {}, agents: {}, startedAt: 0 };
+          msgs: {}, agents: {}, startedAt: 0, stick: true,
+          alive: null, sheriff: null, revealed: [] };
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s)
@@ -306,12 +319,15 @@ function attachStatic(sid){
     var s = d.session;
     $("pluginName").textContent = s.scenario || "—";
     (s.agents || []).forEach(function(a){ S.agents[a.id] = a; });
+    S.alive = s.alive || null; S.sheriff = s.sheriff; S.revealed = s.revealed || [];
     renderMembers(); setState(s.state, s.winner);
     (s.messages || []).forEach(function(m){
       addBubble(m);
       var node = S.msgs[m.id];
       if (!node) return;
-      node.text.textContent = m.text || "";
+      var actHtml = m.meta && m.meta.action ? actionHtml(m.meta.action) : null;
+      if (actHtml){ node.root.classList.add("act-msg"); node.text.innerHTML = actHtml; }
+      else node.text.textContent = m.text || "";
       node.think.textContent = m.thinking || "";
       node.thinkBox.style.display = (m.thinking || "").trim() ? "block" : "none";
       node.root.classList.remove("thinking-now");
@@ -323,14 +339,23 @@ function attachStatic(sid){
       }
     });
     updateMetrics();
-    scrollBottom();
+    S.stick = true;
+    scrollBottom(true);
   });
 }
 
 function handleEvent(e){
+  if (e.type === "state"){
+    S.alive = e.alive || S.alive;
+    S.sheriff = e.sheriff;
+    S.revealed = e.revealed || [];
+    renderMembers();
+    return;
+  }
   if (e.type === "snapshot"){
     $("pluginName").textContent = e.scenario || "—";
     (e.agents || []).forEach(function(a){ S.agents[a.id] = a; });
+    S.alive = e.alive || null; S.sheriff = e.sheriff; S.revealed = e.revealed || [];
     renderMembers();
     setState(e.state);
     return;
@@ -359,7 +384,21 @@ function handleEvent(e){
   if (e.type === "message_end"){
     var n = S.msgs[e.id];
     if (!n) return;
-    n.text.textContent = e.text || "";
+    if (e.meta && e.meta.action){
+      var html = actionHtml(e.meta.action);
+      if (html){
+        n.root.classList.add("act-msg");
+        n.text.innerHTML = html;
+      }
+    } else {
+      n.text.textContent = e.text || "";
+    }
+    if (e.meta && e.meta.role){
+      var who = n.root.querySelector(".who");
+      if (who && !who.parentNode.querySelector(".role")){
+        who.insertAdjacentHTML("afterend", '<span class="role">' + esc(e.meta.role) + '</span>');
+      }
+    }
     n.think.textContent = e.thinking || "";
     n.thinkBox.style.display = (e.thinking || "").trim() ? "block" : "none";
     n.status.textContent = "";
@@ -419,22 +458,51 @@ function handleEvent(e){
   }
 }
 
+var CHIP = {
+  kill:   {cls:"kill",   label:"刀"},
+  check:  {cls:"check",  label:"查"},
+  poison: {cls:"poison", label:"毒"},
+  save:   {cls:"poison", label:"救"},
+  guard:  {cls:"check",  label:"守"},
+  vote:   {cls:"vote",   label:"票"},
+  shoot:  {cls:"kill",   label:"开枪"},
+  pass_badge: {cls:"badge", label:"警徽"},
+  destruct:   {cls:"badge", label:"自爆"},
+  abstain:    {cls:"", label:"弃权"},
+  destroy:    {cls:"badge", label:"警徽作废"}
+};
+function actionHtml(action){
+  if (!action) return null;
+  var kind = action.kind || "";
+  var c = CHIP[kind];
+  if (!c) return null;
+  var target = action.target;
+  var arrow = (target !== undefined && target !== null && target !== "")
+    ? '<span class="arr">→</span><b>' + esc(target) + '</b>&nbsp;号' : "";
+  return '<span class="chip ' + c.cls + '">' + esc(c.label) + '</span>' + arrow;
+}
+
 function addBubble(m){
   var stream = $("stream");
   if (m.kind === "system"){
     var d = document.createElement("div");
     d.className = "sys";
-    d.textContent = m.text || "";
+    d.textContent = (m.channel === "meta" ? "〔仅观察者〕" : "") + (m.text || "");
     stream.appendChild(d);
     scrollBottom();
     return;
   }
   var root = document.createElement("div");
   root.className = "msg thinking-now" + (m.kind === "action" ? " act-msg" : "");
+  var meta = m.meta || {};
+  var agent = S.agents[m.sender] || {};
+  var role = meta.role ? '<span class="role">' + esc(meta.role) + '</span>' : '';
+  var modelName = meta.model || agent.model || '';
   root.innerHTML =
     '<div class="ava" style="background:' + colorFor(m.sender) + '">' + esc(m.sender) + '</div>' +
     '<div class="body">' +
-      '<div class="head"><span class="who">' + esc(m.sender_name) + '</span>' +
+      '<div class="head"><span class="who">' + esc(m.sender_name) + '</span>' + role +
+      '<span class="mdl">' + esc(modelName) + '</span>' +
       '<span class="meta"></span><span class="meta status"></span></div>' +
       '<div class="bubble"><span class="text"></span></div>' +
       '<details class="think" style="display:none"><summary></summary><div class="t"></div></details>' +
@@ -456,14 +524,19 @@ function addBubble(m){
 
 function renderMembers(){
   var ids = Object.keys(S.agents);
+  var alive = S.alive;
   $("members").innerHTML = ids.length ? ids.map(function(id){
     var a = S.agents[id];
-    return '<div class="member">' +
-      '<span class="dot" data-agent-dot="' + id + '"></span>' +
+    var isAlive = !alive || alive.indexOf(Number(id)) >= 0;
+    var marks = "";
+    if (String(S.sheriff) === String(id)) marks += '<span class="role" title="警长">警长</span>';
+    if ((S.revealed || []).indexOf(Number(id)) >= 0) marks += '<span class="role" title="已翻牌">翻牌</span>';
+    return '<div class="member' + (isAlive ? '' : ' out') + '">' +
+      '<span class="dot" data-agent-dot="' + id + '" style="' + (isAlive ? '' : 'background:#d5dae2') + '"></span>' +
       '<span class="ava" style="width:22px;height:22px;border-radius:7px;font-size:11px;background:' +
         colorFor(id) + '">' + id + '</span>' +
-      '<span class="nm">' + esc(a.name) + '</span>' +
-      '<span class="md">' + esc(a.model) + '</span></div>';
+      '<span class="nm">' + esc(a.name) + '</span>' + marks +
+      '<span class="md">' + esc(a.model || '') + '</span></div>';
   }).join("") : '<div class="hint">—</div>';
 }
 
@@ -495,12 +568,17 @@ function setState(state, winner){
     (winner ? " · 胜方 <b>" + esc(winner) + "</b>" : "");
 }
 
-function scrollBottom(){
+function nearBottom(){
   var el = $("stream");
-  el.scrollTop = el.scrollHeight;
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+}
+function scrollBottom(force){
+  var el = $("stream");
+  if (force || S.stick) el.scrollTop = el.scrollHeight;
 }
 
 // ---------- 绑定 ----------
+$("stream").addEventListener("scroll", function(){ S.stick = nearBottom(); });
 $("btnNew").onclick = openModal;
 $("btnCancel").onclick = closeModal;
 $("btnStart").onclick = startSession;

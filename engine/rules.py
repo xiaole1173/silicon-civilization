@@ -46,7 +46,8 @@ def validate_action(state: GameState, seat: int, action: dict, *, context: str) 
 
     context: night_wolf | night_seer | night_witch | day_speak | day_vote | hunter
     """
-    if seat not in state.alive and context not in ("hunter", "last_words"):
+    DEATH_CONTEXTS = ("hunter", "last_words", "badge", "wolf_king")
+    if seat not in state.alive and context not in DEATH_CONTEXTS:
         return False, "座位 {} 已出局，不能行动".format(seat)
     expected_role = CONTEXT_ROLE.get(context)
     if expected_role and state.role_of(seat) != expected_role:

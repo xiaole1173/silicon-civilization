@@ -144,6 +144,28 @@ class TestWerewolfPlugin(unittest.TestCase):
         self.assertNotIn("int() argument", joined, "不应把类型错误暴露成对局中断")
         self.assertNotIn("Traceback", joined)
 
+    def test_no_role_leak_in_public_channel(self):
+        """身份表只能出现在观察者频道，绝不能进公共频道（否则模型直接读到）。"""
+        plugin = self.plugin
+        seats = [{"model_conf": {"protocol": "chat_completions", "api_base": "http://127.0.0.1:9/v1",
+                                 "model": "fake", "api_key": "x"}, "name": "{}号".format(i)}
+                 for i in range(1, 13)]
+        session = runner_mod.create_session("t-leak", plugin, {"seed": 5}, seats, "泄漏检查")
+        plugin.setup(session)
+
+        public_text = " ".join(m.text or "" for m in session.messages if m.channel == "public")
+        for role in ("预言家", "女巫", "狼人", "白痴", "猎人"):
+            self.assertNotIn("=" + role, public_text, "公共频道不应出现完整身份表")
+        observer_text = " ".join(m.text or "" for m in session.messages if m.channel == "meta")
+        self.assertIn("身份表", observer_text)
+
+        # 观察者频道的消息对所有 agent 都不可见
+        meta_msgs = [m for m in session.messages if m.channel == "meta"]
+        self.assertTrue(meta_msgs)
+        for msg in meta_msgs:
+            for aid in session.agents:
+                self.assertFalse(session.visible_to(aid, msg), "模型不应看到观察者旁白")
+
     def test_validation_rejects_illegal_action(self):
         """自刀（kill 自己）应被规则挡下，触发重说。"""
         plugin = self.plugin
