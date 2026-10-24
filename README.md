@@ -121,7 +121,7 @@ python -m unittest discover -s tests
 
 ## 许可
 
-待定（建议 MIT）。在确定许可前，请勿分发或商用。
+[MIT](LICENSE) © 2026 xiaole1173
 
 ## 致谢
 
