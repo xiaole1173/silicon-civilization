@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>模型管理 · Silicon Civilization</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#fff; --line:#e2e6eb; --ink:#1f2430; --muted:#6b7280;
+    --accent:#2f6fdd; --accent-weak:#eaf1fd;
+    --ok:#1e7e45; --ok-bg:#e7f4ec; --err:#c0392b; --err-bg:#fdecea; --warn:#b45309; --warn-bg:#fdf1e0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.55 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;}
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:11px 18px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  header h1{font-size:15px;margin:0;font-weight:650;}
+  nav{display:flex;gap:6px;}
+  nav a{font-size:13px;color:var(--muted);text-decoration:none;padding:3px 10px;border-radius:999px;border:1px solid transparent;}
+  nav a.on{color:var(--accent);background:var(--accent-weak);border-color:#d5e3fb;}
+  nav a:hover{color:var(--ink);}
+  .spacer{flex:1}
+  .dot{width:7px;height:7px;border-radius:50%;background:#c8cdd4;display:inline-block;margin-right:5px;}
+  .dot.on{background:var(--ok);}
+  .dot.off{background:var(--err);}
+  main{padding:14px;display:grid;grid-template-columns:400px 1fr;gap:14px;align-items:start;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;}
+  .card h2{font-size:12.5px;color:var(--muted);font-weight:600;margin:0 0 12px;letter-spacing:.03em;}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:0 0 4px;}
+  .field{margin-bottom:11px;}
+  input[type=text],input[type=password],input[type=number],select,textarea{
+    width:100%;font:inherit;font-size:13px;color:var(--ink);background:#fff;
+    border:1px solid var(--line);border-radius:8px;padding:7px 9px;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:#a9c6f6;box-shadow:0 0 0 3px #eef4fe;}
+  .row{display:flex;gap:9px;}
+  .row > .field{flex:1;margin-bottom:0;}
+  .hint{font-size:11.5px;color:#9aa1ab;margin-top:3px;line-height:1.45;}
+  button{font:inherit;font-size:13px;border:1px solid var(--line);background:#fff;border-radius:8px;
+    padding:7px 13px;cursor:pointer;}
+  button:hover{background:#f0f2f5;}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button.primary:hover{background:#2a63c8;}
+  button.danger{color:var(--err);}
+  button.danger:hover{background:var(--err-bg);border-color:#f3c0bb;}
+  button.small{padding:3px 9px;font-size:12px;}
+  .actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+  .msg{margin-top:10px;font-size:12.5px;border-radius:8px;padding:7px 10px;display:none;}
+  .msg.show{display:block;}
+  .msg.ok{background:var(--ok-bg);color:var(--ok);}
+  .msg.err{background:var(--err-bg);color:var(--err);}
+  .msg.warn{background:var(--warn-bg);color:var(--warn);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-weight:600;font-size:11.5px;color:var(--muted);padding:6px 8px;
+    border-bottom:1px solid var(--line);white-space:nowrap;}
+  td{padding:8px;border-bottom:1px solid #f0f2f4;vertical-align:top;}
+  tr:last-child td{border-bottom:0;}
+  .mono{font-family:Consolas,"Cascadia Mono",monospace;font-size:12px;}
+  .tag{font-size:11.5px;padding:1px 7px;border-radius:6px;background:#eef0f2;color:#556070;white-space:nowrap;}
+  .tag.ok{background:var(--ok-bg);color:var(--ok);}
+  .tag.err{background:var(--err-bg);color:var(--err);}
+  .tag.warn{background:var(--warn-bg);color:var(--warn);}
+  .base{color:var(--muted);font-size:12px;word-break:break-all;}
+  .empty{color:#9aa1ab;font-size:13px;padding:16px 4px;}
+  .bulk summary{cursor:pointer;font-size:12.5px;color:var(--muted);}
+  .bulk textarea{font-family:Consolas,monospace;font-size:12px;margin-top:8px;min-height:78px;}
+  .toggles{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+  .toggles a{color:var(--accent);cursor:pointer;text-decoration:none;font-size:12px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Silicon Civilization</h1>
+  <nav>
+    <a href="/web/models.html" class="on">模型管理</a>
+    <a href="/viz/index.html">回放台</a>
+  </nav>
+  <span class="spacer"></span>
+  <span class="tag" id="health"><span class="dot"></span>检测服务</span>
+  <span class="tag" id="count">0 个模型</span>
+</header>
+
+<main>
+  <section class="card">
+    <h2 id="formTitle">添加模型</h2>
+
+    <div class="field">
+      <label for="f_name">显示名称</label>
+      <input type="text" id="f_name" placeholder="例如 DeepSeek Chat（狼人杀 1 号位）">
+    </div>
+
+    <div class="field">
+      <label for="f_provider">提供商预设</label>
+      <select id="f_provider"></select>
+      <div class="hint">选择预设会自动填好 Base URL 和模型名，之后可以随意改。</div>
+    </div>
+
+    <div class="field">
+      <label for="f_protocol">接口协议</label>
+      <select id="f_protocol"></select>
+      <div class="hint" id="protocolHint">不同协议路径不同：chat/completions、responses、messages。</div>
+    </div>
+
+    <div class="field">
+      <label for="f_base">API Base URL</label>
+      <input type="text" id="f_base" placeholder="https://api.deepseek.com/v1" spellcheck="false">
+      <div class="hint">填到版本号为止（含 /v1 或 /v4），服务端按所选协议拼路径（/chat/completions、/responses 或 /messages）。</div>
+    </div>
+
+    <div class="field">
+      <label for="f_model">模型名（model 参数）</label>
+      <input type="text" id="f_model" placeholder="deepseek-chat" spellcheck="false">
+    </div>
+
+    <div class="field">
+      <label for="f_key">API Key</label>
+      <input type="password" id="f_key" placeholder="sk-..." spellcheck="false" autocomplete="off">
+      <div class="toggles" style="margin-top:5px">
+        <a id="toggleKey">显示明文</a>
+        <span id="keyHint"></span>
+      </div>
+      <div class="hint">只保存在本机 data/models.json，接口永远只返回掩码。编辑时留空表示沿用原 Key。</div>
+    </div>
+
+    <div class="field" style="margin-top:16px;padding-top:13px;border-top:1px dashed #e2e6eb">
+      <label for="f_env">或改用环境变量名（可选，key 不落盘）</label>
+      <input type="text" id="f_env" placeholder="DEEPSEEK_API_KEY" spellcheck="false">
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="f_temp">temperature</label>
+        <input type="number" id="f_temp" value="0.7" step="0.1" min="0" max="2">
+      </div>
+      <div class="field">
+        <label for="f_maxtok">max_tokens</label>
+        <input type="number" id="f_maxtok" value="512" step="16" min="16">
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:11px">
+      <label for="f_notes">备注</label>
+      <input type="text" id="f_notes" placeholder="可选：用途、座位等">
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="btnSave">保存</button>
+      <button id="btnTest">测试连通</button>
+      <button id="btnCancel" style="display:none">取消编辑</button>
+    </div>
+    <div class="msg" id="formMsg"></div>
+
+    <details class="bulk" style="margin-top:16px">
+      <summary>批量添加（每行一个：名称 | Base URL | Key | 模型名，第 5 段可选协议）</summary>
+      <textarea id="bulkText" placeholder="阿岚-通义 | https://dashscope.aliyuncs.com/compatible-mode/v1 | sk-xxx | qwen-plus
+老周-DeepSeek | https://api.deepseek.com/v1 | sk-yyy | deepseek-chat
+Claude | https://api.anthropic.com/v1 | sk-ant-zzz | claude-sonnet-4-5 | anthropic_messages
+本地-ollama | http://localhost:11434/v1 |  | qwen2.5:7b"></textarea>
+      <div class="actions" style="margin-top:8px">
+        <button id="btnBulk">导入全部</button>
+        <button id="btnLoad">载入示例</button>
+      </div>
+      <div class="msg" id="bulkMsg"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>已接入模型</h2>
+    <div class="msg" id="storeMsg"></div>
+    <div id="listWrap"><div class="empty">还没有模型，先在左侧添加一个。</div></div>
+  </section>
+</main>
+
+<script>
+var state = { models: [], providers: [], editing: null };
+
+function $(id){ return document.getElementById(id); }
+
+function api(method, url, body){
+  var opt = { method: method, headers: { "Content-Type": "application/json" } };
+  if (body !== undefined && body !== null) opt.body = JSON.stringify(body);
+  return fetch(url, opt).then(function(res){
+    return res.json().catch(function(){ return { ok:false, error:"返回不是 JSON" }; })
+      .then(function(data){ data.__status = res.status; return data; });
+  });
+}
+
+function showMsg(el, text, kind){
+  el.textContent = text;
+  el.className = "msg show " + (kind || "ok");
+}
+function clearMsg(el){ el.className = "msg"; el.textContent = ""; }
+
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+}
+
+function protocolShort(p){
+  if (p === "responses") return "responses";
+  if (p === "anthropic_messages") return "messages";
+  return "chat";
+}
+
+function showProtocolHint(){
+  var p = $("f_protocol").value;
+  var map = {
+    chat_completions: "POST {Base URL}/chat/completions —— OpenAI 兼容，绝大多数厂商和本地服务用它。",
+    responses: "POST {Base URL}/responses —— OpenAI Responses API，参数名是 max_output_tokens。",
+    anthropic_messages: "POST {Base URL}/messages —— Anthropic Messages，用 x-api-key 头，system 单独传。"
+  };
+  $("protocolHint").textContent = map[p] || "";
+}
+
+function loadProtocols(){
+  return api("GET", "/api/protocols").then(function(data){
+    var list = (data.protocols || []);
+    $("f_protocol").innerHTML = list.map(function(p){
+      return '<option value="' + esc(p.id) + '">' + esc(p.label) + '</option>';
+    }).join("") || '<option value="chat_completions">OpenAI 兼容（chat/completions）</option>';
+    showProtocolHint();
+  }).catch(function(){ /* 服务不可用时保持默认项 */ });
+}
+
+function providerOptions(){
+  $("f_provider").innerHTML = state.providers.map(function(p){
+    return '<option value="' + esc(p.id) + '">' + esc(p.label) + '</option>';
+  }).join("") || '<option value="custom">自定义</option>';
+}
+
+function applyPreset(pid){
+  var p = state.providers.filter(function(x){ return x.id === pid; })[0];
+  if (!p) return;
+  if (p.api_base) $("f_base").value = p.api_base;
+  if (p.model) $("f_model").value = p.model;
+  $("f_env").value = p.env || "";
+  if (p.protocol) {
+    $("f_protocol").value = p.protocol;
+    showProtocolHint();
+  }
+  if (!p.env) {
+    $("keyHint").textContent = "该端点可留空";
+  } else {
+    $("keyHint").textContent = "";
+  }
+}
+
+function resetForm(){
+  state.editing = null;
+  $("formTitle").textContent = "添加模型";
+  $("f_name").value = "";
+  $("f_protocol").value = "chat_completions";
+  $("f_base").value = "";
+  $("f_model").value = "";
+  $("f_key").value = "";
+  $("f_env").value = "";
+  $("f_temp").value = "0.7";
+  $("f_maxtok").value = "512";
+  $("f_notes").value = "";
+  $("keyHint").textContent = "";
+  $("btnCancel").style.display = "none";
+  $("btnSave").textContent = "保存";
+  clearMsg($("formMsg"));
+}
+
+function formPayload(){
+  return {
+    name: $("f_name").value.trim(),
+    protocol: $("f_protocol").value,
+    provider: $("f_provider").value,
+    api_base: $("f_base").value.trim(),
+    model: $("f_model").value.trim(),
+    api_key: $("f_key").value,
+    api_key_env: $("f_env").value.trim(),
+    temperature: parseFloat($("f_temp").value || "0.7"),
+    max_tokens: parseInt($("f_maxtok").value || "512", 10),
+    notes: $("f_notes").value.trim()
+  };
+}
+
+function renderList(){
+  var wrap = $("listWrap");
+  if (!state.models.length){
+    wrap.innerHTML = '<div class="empty">还没有模型，先在左侧添加一个。</div>';
+    $("count").textContent = "0 个模型";
+    return;
+  }
+  $("count").textContent = state.models.length + " 个模型";
+  var rows = state.models.map(function(m){
+    var lt = m.last_test || {};
+    var testTag = "";
+    if (lt.at){
+      testTag = lt.ok
+        ? '<span class="tag ok">通 ' + (lt.latency_ms || 0) + 'ms</span>'
+        : '<span class="tag err">失败</span>';
+    } else {
+      testTag = '<span class="tag">未测</span>';
+    }
+    var keyless = (m.provider === "ollama" || m.provider === "vllm");
+    var keyTag = m.api_key_set
+      ? '<span class="tag ok mono">' + esc(m.api_key_masked) + '</span>'
+      : (m.api_key_env ? '<span class="tag warn mono">env:' + esc(m.api_key_env) + '</span>'
+                       : (keyless ? '<span class="tag">无需 Key</span>'
+                                  : '<span class="tag warn">无 Key</span>'));
+    return '<tr>' +
+      '<td><b>' + esc(m.name) + '</b>' + (m.notes ? '<div class="base">' + esc(m.notes) + '</div>' : '') + '</td>' +
+      '<td><span class="tag">' + esc(m.provider) + '</span>' +
+        '<span class="tag mono" style="margin-left:4px">' + esc(protocolShort(m.protocol)) + '</span>' +
+        '<div class="mono base">' + esc(m.model) + '</div></td>' +
+      '<td class="mono base">' + esc(m.api_base) + '</td>' +
+      '<td>' + keyTag + '</td>' +
+      '<td>' + testTag + (lt.error ? '<div class="base" style="color:#c0392b">' + esc(lt.error.slice(0,120)) + '</div>' : '') + '</td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="small" data-act="test" data-id="' + esc(m.id) + '">测试</button> ' +
+        '<button class="small" data-act="edit" data-id="' + esc(m.id) + '">编辑</button> ' +
+        '<button class="small danger" data-act="del" data-id="' + esc(m.id) + '">删除</button>' +
+      '</td></tr>';
+  }).join("");
+  wrap.innerHTML = '<table><thead><tr>' +
+    '<th>名称</th><th>模型</th><th>Base URL</th><th>Key</th><th>连通</th><th>操作</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+function showStoreError(text){
+  var el = $("storeMsg");
+  if (!text){ el.className = "msg"; el.textContent = ""; return; }
+  el.textContent = text;
+  el.className = "msg show err";
+}
+function loadModels(){
+  return api("GET", "/api/models").then(function(data){
+    if (!data.ok){
+      // 关键：失败时保留原列表，不能把界面清空，否则看起来像"模型全没了"
+      showStoreError("读取模型列表失败：" + (data.error || "未知错误"));
+      return;
+    }
+    showStoreError("");
+    state.models = (data.models || []);
+    renderList();
+  }).catch(function(){
+    showStoreError("无法连接本地服务，列表保持上次内容。");
+  });
+}
+
+function loadProviders(){
+  return api("GET", "/api/providers").then(function(data){
+    state.providers = (data.providers || []);
+    providerOptions();
+  });
+}
+
+function save(){
+  var payload = formPayload();
+  clearMsg($("formMsg"));
+  if (!payload.name){ return showMsg($("formMsg"), "请填写显示名称", "err"); }
+  if (!payload.api_base){ return showMsg($("formMsg"), "请填写 API Base URL", "err"); }
+  if (!payload.model){ return showMsg($("formMsg"), "请填写模型名", "err"); }
+  var req = state.editing
+    ? api("PUT", "/api/models/" + encodeURIComponent(state.editing), payload)
+    : api("POST", "/api/models", payload);
+  req.then(function(data){
+    if (!data.ok){
+      return showMsg($("formMsg"), data.error || "保存失败", "err");
+    }
+    showMsg($("formMsg"), state.editing ? "已更新" : "已添加", "ok");
+    var id = data.model && data.model.id;
+    resetForm();
+    return loadModels().then(function(){
+      if (id) return testOne(id, true);
+    });
+  });
+}
+
+function testOne(id, silent){
+  var btn = document.querySelector('button[data-act="test"][data-id="' + id + '"]');
+  if (btn){ btn.textContent = "测试中"; btn.disabled = true; }
+  return api("POST", "/api/models/" + encodeURIComponent(id) + "/test", {}).then(function(data){
+    if (btn){ btn.textContent = "测试"; btn.disabled = false; }
+    var r = (data.result || {});
+    if (!silent && $("formMsg")){
+      if (r.ok) showMsg($("formMsg"), "连通正常，" + r.latency_ms + "ms，回复：" + (r.reply || "（空）"), "ok");
+      else showMsg($("formMsg"), "连通失败：" + (r.error || "未知错误"), "err");
+    }
+    return loadModels();
+  });
+}
+
+function editModel(id){
+  var m = state.models.filter(function(x){ return x.id === id; })[0];
+  if (!m) return;
+  state.editing = id;
+  $("formTitle").textContent = "编辑：" + m.name;
+  $("f_name").value = m.name;
+  $("f_provider").value = m.provider || "custom";
+  $("f_protocol").value = m.protocol || "chat_completions";
+  showProtocolHint();
+  $("f_base").value = m.api_base;
+  $("f_model").value = m.model;
+  $("f_key").value = "";
+  $("f_env").value = m.api_key_env || "";
+  $("f_temp").value = m.temperature;
+  $("f_maxtok").value = m.max_tokens;
+  $("f_notes").value = m.notes || "";
+  $("keyHint").textContent = m.api_key_set ? "已保存（掩码 " + m.api_key_masked + "），留空即沿用" : "当前无 Key";
+  $("btnCancel").style.display = "inline-block";
+  $("btnSave").textContent = "保存修改";
+  clearMsg($("formMsg"));
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function delModel(id){
+  var m = state.models.filter(function(x){ return x.id === id; })[0];
+  if (!m) return;
+  if (!confirm("确定删除模型「" + m.name + "」？")) return;
+  api("DELETE", "/api/models/" + encodeURIComponent(id)).then(function(){
+    if (state.editing === id) resetForm();
+    loadModels();
+  });
+}
+
+function bulkImport(){
+  var lines = $("bulkText").value.split("\n").map(function(s){ return s.trim(); })
+    .filter(function(s){ return s && s.indexOf("|") > 0; });
+  if (!lines.length){ return showMsg($("bulkMsg"), "没有可解析的行", "err"); }
+  var jobs = lines.map(function(line){
+    var parts = line.split("|").map(function(s){ return s.trim(); });
+    return {
+      name: parts[0] || "未命名",
+      api_base: parts[1] || "",
+      api_key: parts[2] || "",
+      model: parts[3] || "",
+      protocol: (parts[4] || "chat_completions"),
+      provider: "custom"
+    };
+  });
+  var ok = 0, fail = 0;
+  var seq = Promise.resolve();
+  jobs.forEach(function(job){
+    seq = seq.then(function(){
+      return api("POST", "/api/models", job).then(function(d){
+        if (d.ok) ok++; else fail++;
+      });
+    });
+  });
+  seq.then(function(){
+    showMsg($("bulkMsg"), "导入完成：成功 " + ok + " 个，失败 " + fail + " 个", fail ? "warn" : "ok");
+    loadModels();
+  });
+}
+
+function checkHealth(){
+  api("GET", "/api/health").then(function(d){
+    var el = $("health");
+    if (d.ok){ el.innerHTML = '<span class="dot on"></span>服务正常'; }
+    else { el.innerHTML = '<span class="dot off"></span>服务异常'; }
+  }).catch(function(){
+    $("health").innerHTML = '<span class="dot off"></span>无法连接服务（请先运行 python server/app.py）';
+  });
+}
+
+function bind(){
+  $("f_provider").addEventListener("change", function(e){ applyPreset(e.target.value); });
+  $("f_protocol").addEventListener("change", showProtocolHint);
+  $("btnSave").addEventListener("click", save);
+  $("btnCancel").addEventListener("click", resetForm);
+  $("btnTest").addEventListener("click", function(){
+    var payload = formPayload();
+    clearMsg($("formMsg"));
+    if (!payload.api_base || !payload.model){
+      return showMsg($("formMsg"), "先填 Base URL 和模型名再测", "err");
+    }
+    showMsg($("formMsg"), "正在请求模型服务…", "warn");
+    api("POST", "/api/test-inline", payload).then(function(data){
+      if (!data.ok){ return showMsg($("formMsg"), data.error || "测试失败", "err"); }
+      var r = data.result || {};
+      if (r.ok){
+        showMsg($("formMsg"), "连通正常，" + r.latency_ms + "ms，回复：" + (r.reply || "（空）"), "ok");
+      } else {
+        showMsg($("formMsg"), "连通失败：" + (r.error || "未知错误"), "err");
+      }
+    }).catch(function(){
+      showMsg($("formMsg"), "无法连接本地服务", "err");
+    });
+  });
+  $("toggleKey").addEventListener("click", function(){
+    var f = $("f_key");
+    if (f.type === "password"){ f.type = "text"; $("toggleKey").textContent = "隐藏明文"; }
+    else { f.type = "password"; $("toggleKey").textContent = "显示明文"; }
+  });
+  $("btnBulk").addEventListener("click", bulkImport);
+  $("btnLoad").addEventListener("click", function(){
+    $("bulkText").value = [
+      "阿岚-通义 | https://dashscope.aliyuncs.com/compatible-mode/v1 |  | qwen-plus",
+      "老周-DeepSeek | https://api.deepseek.com/v1 |  | deepseek-chat",
+      "本地-ollama | http://localhost:11434/v1 |  | qwen2.5:7b"
+    ].join("\n");
+  });
+  document.addEventListener("click", function(e){
+    var t = e.target;
+    if (!t || !t.getAttribute) return;
+    var act = t.getAttribute("data-act");
+    if (!act) return;
+    var id = t.getAttribute("data-id");
+    if (act === "edit") editModel(id);
+    else if (act === "del") delModel(id);
+    else if (act === "test") testOne(id, false);
+  });
+}
+
+bind();
+checkHealth();
+loadProtocols();
+loadProviders().then(function(){ applyPreset("deepseek"); });
+loadModels();
+</script>
+</body>
+</html>

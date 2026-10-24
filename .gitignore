@@ -1,0 +1,50 @@
+# ==== 运行时数据（含密钥，绝不入库）====
+data/
+!data/models.example.json
+
+# ==== 本地截图（含内部网关/模型名，不入公开仓库）====
+docs/_private/
+
+# ==== 对局日志 ====
+runs/
+*.live.jsonl
+
+# ==== Python ====
+__pycache__/
+*.pyc
+.venv/
+
+# ==== 一次性脚本/日志 ====
+_*.py
+_*.log
+_*.txt
+_*.png
+
+# ==== 与本项目无关的课程资料（保留在磁盘，不入库）====
+part2-poster/
+part3-typing/
+part5-snake/
+samples/
+transformer_explorer/
+W02_资料/
+W02_submission/
+W03_submission/
+W04_submission/
+_session_recover/
+_session_restore/
+_w02_sessions/
+_w03_checks/
+.session-restore/
+_download_samples.mjs
+hero-requiem.html
+snake-build-prompt.txt
+snake-prompt.md
+W02_作业要求总表与完成计划.md
+W02_AI任务完成包.md
+# 一次性脚本
+_*.ps1
+.git.backup-local/
+_pc/
+_pc2/
+github_homepage/
+docs/homepage-*.png

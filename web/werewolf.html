@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>情境仿真观察台</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#fff; --line:#e2e6eb; --ink:#1f2430; --muted:#6b7280;
+    --wolf:#b3261e; --wolf-bg:#fbeae8;
+    --god:#6d28d9; --god-bg:#f1eafe;
+    --vill:#1e7e45; --vill-bg:#e7f4ec;
+    --night:#1e3a8a; --night-bg:#e8eefc;
+    --day:#b45309; --day-bg:#fdf2e3;
+    --priv:#0e7490; --priv-bg:#e1f2f6;
+    --warn:#b45309; --warn-bg:#fdf1e0;
+    --err:#c0392b; --err-bg:#fdecea;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:13.5px/1.55 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;}
+  header{position:sticky;top:0;z-index:9;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:9px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  header h1{font-size:15px;margin:0;font-weight:650;white-space:nowrap;}
+  .chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);
+    border-radius:999px;padding:2px 10px;white-space:nowrap;}
+  .chip b{color:var(--ink);font-weight:600;}
+  .spacer{flex:1}
+  select,button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:#fff;
+    border-radius:8px;padding:5px 9px;cursor:pointer;color:var(--ink);}
+  button:hover{background:#f0f2f5;}
+  select{max-width:280px}
+  .toggle{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;}
+  main{display:grid;grid-template-columns:246px minmax(0,1fr) 320px;gap:12px;padding:12px;
+    align-items:start;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;}
+  .card h2{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 9px;letter-spacing:.03em;}
+  /* 座位 */
+  #seats{position:sticky;top:60px;max-height:calc(100vh - 76px);overflow:auto;}
+  .seat{border:1px solid var(--line);border-radius:10px;padding:7px 9px;margin-bottom:7px;
+    cursor:pointer;transition:border-color .15s,background .15s;}
+  .seat:hover{border-color:#c3cbd6}
+  .seat.active{background:#f7fafd;border-color:#a9c6f6}
+  .seat.dead{opacity:.62}
+  .seat .top{display:flex;align-items:center;gap:6px;}
+  .seat .no{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;}
+  .seat .model{color:var(--muted);font-size:11.5px;flex:1;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;}
+  .role{font-size:11px;border-radius:6px;padding:1px 6px;font-weight:600;white-space:nowrap;}
+  .role.werewolf{color:var(--wolf);background:var(--wolf-bg);}
+  .role.god{color:var(--god);background:var(--god-bg);}
+  .role.villager{color:var(--vill);background:var(--vill-bg);}
+  .role.hidden{color:var(--muted);background:#eef0f2;}
+  .seat .sub{font-size:11.5px;color:#9aa1ab;margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;}
+  .dead-tag{color:var(--err);font-weight:600;}
+  /* 事件流 */
+  .daygroup{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden;
+    background:var(--panel);}
+  .dayhead{display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid var(--line);
+    background:#fafbfc;font-size:12.5px;}
+  .dayhead .dtitle{font-weight:650;}
+  .badge{font-size:11px;border-radius:6px;padding:1px 7px;font-weight:600;white-space:nowrap;}
+  .badge.night{color:var(--night);background:var(--night-bg);}
+  .badge.day{color:var(--day);background:var(--day-bg);}
+  .badge.priv{color:var(--priv);background:var(--priv-bg);}
+  .badge.warn{color:var(--warn);background:var(--warn-bg);}
+  .badge.err{color:var(--err);background:var(--err-bg);}
+  .rows{padding:8px 12px;display:flex;flex-direction:column;gap:6px;}
+  .row{display:flex;gap:8px;align-items:flex-start;font-size:13px;}
+  .who{width:62px;flex:none;color:var(--muted);font-size:12px;padding-top:1px;
+    font-variant-numeric:tabular-nums;}
+  .act{font-size:11.5px;font-weight:600;border-radius:6px;padding:1px 7px;white-space:nowrap;}
+  .act.kill{color:var(--wolf);background:var(--wolf-bg);}
+  .act.guard{color:var(--priv);background:var(--priv-bg);}
+  .act.check{color:var(--god);background:var(--god-bg);}
+  .act.save{color:var(--vill);background:var(--vill-bg);}
+  .act.poison{color:#7c2d12;background:#fbe9e1;}
+  .act.vote{color:#334155;background:#eef2f7;}
+  .act.pass{color:var(--muted);background:#eef0f2;}
+  .act.wolfchat{color:var(--wolf);background:#fdecea;}
+  .wolfline{background:#fdf6f5;border:1px solid #f3d6d2;border-radius:8px;padding:6px 9px;}
+  .wolflabel{font-size:11.5px;color:var(--wolf);font-weight:600;margin-top:2px;}
+  .txt{flex:1;min-width:0;}
+  .speech{background:#fafbfc;border:1px solid #eef1f4;border-radius:8px;padding:6px 9px;}
+  .think{margin-top:5px;}
+  .think summary{cursor:pointer;list-style:none;font-size:11.5px;color:#8b93a1;}
+  .think summary::before{content:"思考 ";font-weight:600;}
+  .think[open] summary::before{content:"收起思考 ";}
+  .think .body{margin-top:5px;padding:7px 9px;border-left:2px solid #dfe5ee;color:#55606f;
+    font-size:12.5px;background:#fcfdfe;white-space:pre-wrap;word-break:break-word;
+    max-height:360px;overflow:auto;}
+  .resolve{font-size:12.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px;
+    margin-top:2px;}
+  .resolve b{color:var(--ink);}
+  .votegrid{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0;}
+  .v{font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#475569;
+    font-variant-numeric:tabular-nums;background:#fff;}
+  .v.abst{color:#9aa1ab}
+  .endbanner{margin:10px 0;padding:10px 14px;border-radius:10px;font-weight:650;
+    background:var(--night-bg);color:var(--night);border:1px solid #c9d8f7;}
+  .empty{color:#9aa1ab;font-size:13px;padding:14px 4px;}
+  .livebox{position:sticky;top:58px;z-index:8;background:#fffdf7;border:1px solid #f0dfb8;
+    border-radius:12px;padding:9px 12px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+  .lv-head{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);}
+  .lv-who{font-weight:650;color:var(--ink);}
+  .lv-status{margin-left:auto;color:var(--warn);font-weight:600;}
+  .lv-think{margin-top:6px;color:#7a6a45;font-size:12.5px;background:#fffbf0;border-left:2px solid #e8d5a8;
+    padding:5px 8px;max-height:120px;overflow:auto;white-space:pre-wrap;border-radius:0 6px 6px 0;
+    display:none;}
+  .lv-answer{margin-top:6px;color:#1f3b2c;font-size:13px;background:#f4fbf6;border-left:2px solid #b7e0c6;
+    padding:5px 8px;max-height:120px;overflow:auto;white-space:pre-wrap;border-radius:0 6px 6px 0;
+    display:none;}
+  .spk{margin-left:8px;font-size:11.5px;padding:1px 7px;border-radius:6px;
+    border:1px solid #dfe5ee;background:#fff;color:#55606f;cursor:pointer;vertical-align:1px;}
+  .spk:hover{background:#f2f6fb;color:#1f2430;}
+  .spk.playing{background:#e8f2ff;border-color:#a9c6f6;color:#1d4ed8;}
+  .caret{display:inline-block;width:7px;height:13px;background:#c9a227;margin-left:2px;
+    animation:blink 1s steps(1) infinite;vertical-align:-2px;}
+  @keyframes blink{50%{opacity:0;}}
+  /* 右栏 */
+  aside{position:sticky;top:60px;display:flex;flex-direction:column;gap:12px;
+    max-height:calc(100vh - 76px);overflow:auto;}
+  .kv{display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0;}
+  .kv span:first-child{color:var(--muted);}
+  .kv b{font-variant-numeric:tabular-nums;}
+  .mini{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .m{background:var(--bg);border-radius:8px;padding:7px 9px;}
+  .m .k{font-size:11.5px;color:var(--muted);}
+  .m .v{font-size:16px;font-weight:650;font-variant-numeric:tabular-nums;}
+  .audit-ok{color:var(--vill);font-weight:600;font-size:12.5px;}
+  .audit-bad{color:var(--err);font-weight:600;font-size:12.5px;}
+  ul.findings{margin:6px 0 0;padding-left:18px;font-size:12px;color:#55606f;}
+  ul.findings li{margin:2px 0;}
+  .note{font-size:11.5px;color:#9aa1ab;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="pageTitle">情境仿真观察台</h1>
+  <select id="runSel"></select>
+  <button id="btnReload">刷新</button>
+  <span class="chip" id="metaChip">未选择对局</span>
+  <span class="chip" id="phaseChip">—</span>
+  <label class="toggle"><input type="checkbox" id="chkReveal"> 揭示身份</label>
+  <label class="toggle"><input type="checkbox" id="chkThink" checked> 显示思考</label>
+  <label class="toggle"><input type="checkbox" id="chkFollow" checked> 跟随直播</label>
+  <label class="toggle"><input type="checkbox" id="chkTts"> 自动播报</label>
+  <select id="voiceSel" title="音色">
+    <option value="auto">按座位自动</option>
+    <option value="kangkang">男声·康康</option>
+    <option value="huihui">女声·慧慧</option>
+    <option value="yaoyao">女声·瑶瑶</option>
+  </select>
+  <span class="spacer"></span>
+  <span class="chip" id="connChip">连接中</span>
+</header>
+
+<main>
+  <section class="card" id="seats"><h2>座位 / 模型</h2><div id="seatList"></div></section>
+
+  <section id="feedWrap">
+    <div class="livebox" id="liveBox" style="display:none">
+      <div class="lv-head"><span class="lv-who" id="lvWho"></span>
+        <span class="badge" id="lvPhase"></span>
+        <span class="lv-status" id="lvStatus"></span></div>
+      <div class="lv-think" id="lvThink"></div>
+      <div class="lv-answer" id="lvAnswer"></div>
+    </div>
+    <div id="feed"><div class="empty">选择左侧对局日志，或等待新对局开始。</div></div>
+  </section>
+
+  <aside>
+    <section class="card">
+      <h2>战况</h2>
+      <div id="board"></div>
+    </section>
+    <section class="card">
+      <h2>本局指标</h2>
+      <div class="mini" id="metrics"></div>
+      <div id="facts" style="margin-top:8px"></div>
+    </section>
+    <section class="card">
+      <h2>体检</h2>
+      <div id="audit"><div class="note">对局结束后自动体检。</div></div>
+    </section>
+    <section class="card">
+      <h2>图例</h2>
+      <div class="note">
+        刀=狼人击杀 · 守=守卫守护 · 查=预言家查验 · 救/毒=女巫 · 票=投票<br>
+        狼队密聊=狼人夜间内部商量（只有狼能看到，观察者可读全文）<br>
+        「私密」标记的条目玩家看不到，只有观察者可见。<br>
+        身份默认隐藏，点「揭示身份」才显示，避免先入为主。
+      </div>
+    </section>
+  </aside>
+</main>
+
+<script>
+var S = {
+  name: null, offset: 0, size: 0, events: [], reveal: false, think: true,
+  follow: true, filterSeat: null, roles: {}, finished: false, audit: null, timer: null,
+  liveOffset: 0, live: null,
+  tts: false, voice: "auto", speechQueue: [], playing: false, ttsBaseline: 0
+};
+
+// ---------- 语音播报（服务端本地 TTS，零下载） ----------
+function voiceFor(seat){
+  if (S.voice && S.voice !== "auto") return S.voice;
+  var list = ["kangkang", "huihui", "yaoyao"];
+  return list[(seat - 1) % list.length];
+}
+
+function playSpeech(text, seat){
+  if (!text) return Promise.resolve();
+  return fetch("/api/tts", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: String(text).slice(0, 600), voice: voiceFor(seat) })
+  }).then(function(r){
+    if (!r.ok) throw new Error("tts " + r.status);
+    return r.blob();
+  }).then(function(blob){
+    var url = URL.createObjectURL(blob);
+    var audio = new Audio(url);
+    return new Promise(function(done){
+      function finish(){ URL.revokeObjectURL(url); done(); }
+      audio.onended = finish;
+      audio.onerror = finish;
+      audio.play().catch(finish);
+    });
+  }).catch(function(){ /* 语音失败不影响阅读 */ });
+}
+
+function playPhaseTone(kind){
+  try {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    S.audioCtx = S.audioCtx || new Ctx();
+    var ctx = S.audioCtx;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    if (kind === "night"){
+      osc.type = "sine"; osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.7);
+    } else {
+      osc.type = "triangle"; osc.frequency.setValueAtTime(520, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(780, ctx.currentTime + 0.35);
+    }
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.8);
+    osc.start(); osc.stop(ctx.currentTime + 0.85);
+  } catch (e) { /* 忽略音频失败 */ }
+}
+
+function enqueueSpeech(seat, text){
+  S.speechQueue.push({ seat: seat, text: text });
+  flushSpeechQueue();
+}
+
+function flushSpeechQueue(){
+  if (!S.tts || S.playing || !S.speechQueue.length) return;
+  var item = S.speechQueue.shift();
+  S.playing = true;
+  playSpeech(item.text, item.seat).then(function(){
+    S.playing = false;
+    setTimeout(flushSpeechQueue, 120);
+  });
+}
+
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function api(path){
+  return fetch(path).then(function(r){ return r.json(); });
+}
+function roleOf(seat){
+  var r = S.roles[String(seat)] || S.roles[seat];
+  return r || "";
+}
+var ROLE_CN = {werewolf:"狼人", seer:"预言家", witch:"女巫", hunter:"猎人",
+               guard:"守卫", villager:"村民"};
+var ROLE_SHORT = {werewolf:"狼", seer:"预", witch:"女", hunter:"猎", guard:"守", villager:"民"};
+
+function roleLabel(role){
+  var labels = S.roleLabels || {};
+  return labels[role] || ROLE_CN[role] || role;
+}
+function roleBadge(role){
+  if (!S.reveal || !role) return '<span class="role hidden">身份?</span>';
+  var cls = role === "werewolf" ? "werewolf" : (role === "villager" ? "villager" : "god");
+  return '<span class="role ' + cls + '">' + esc(roleLabel(role)) + '</span>';
+}
+
+// ---------- 拉取 ----------
+function loadRuns(){
+  return api("/api/runs").then(function(data){
+    var runs = data.runs || [];
+    $("connChip").innerHTML = '<span style="color:#1e7e45">●</span> 已连接';
+    $("runSel").innerHTML = runs.length
+      ? runs.map(function(r){
+          return '<option value="' + esc(r.name) + '">' + esc(r.name) +
+            (r.players ? "  (" + r.players + "人)" : "") + '</option>';
+        }).join("")
+      : '<option value="">（runs/ 里还没有日志）</option>';
+    var wanted = new URLSearchParams(location.search).get("run");
+    if (wanted && runs.some(function(r){ return r.name === wanted; })){
+      selectRun(wanted);
+    } else if (!S.name && runs.length){
+      selectRun(runs[0].name);
+    }
+  }).catch(function(){
+    $("connChip").innerHTML = '<span style="color:#c0392b">●</span> 未连接（先运行 python server/app.py）';
+  });
+}
+
+function selectRun(name){
+  if (!name) return;
+  S.name = name; S.offset = 0; S.events = []; S.roles = {}; S.finished = false;
+  S.audit = null; S.filterSeat = null; S.liveOffset = 0; S.live = null;
+  $("liveBox").style.display = "none";
+  $("runSel").value = name;
+  poll(true);
+}
+
+function poll(force){
+  if (!S.name) return Promise.resolve();
+  if (!force && !S.follow) return Promise.resolve();
+  return api("/api/runs/" + encodeURIComponent(S.name) + "?offset=" + S.offset)
+    .then(function(data){
+      if (!data.ok) return;
+      S.size = data.size || 0;
+      var added = data.events || [];
+      var firstLoad = !S.ttsBaseline;
+      if (added.length){
+        S.events = S.events.concat(added);
+        added.forEach(function(e){
+          if (e.event === "role_layout" && e.seats){ S.roles = e.seats; }
+        });
+        if (!firstLoad && S.tts){
+          added.forEach(function(e){
+            if (e.event === "phase") playPhaseTone(e.phase);
+          });
+          added.forEach(function(e){
+            if (e.event === "action" && e.kind === "speak" &&
+                (e.context === "day_speak" || e.context === "wolf_speak")){
+              enqueueSpeech(e.seat, e.text || "");
+            }
+          });
+        }
+        var last = added[added.length - 1];
+        if (last && last.seq) S.ttsBaseline = last.seq;
+      }
+      S.offset = data.next_offset || S.offset;
+      S.finished = S.events.some(function(e){ return e.event === "game_end"; });
+      updateCurrentTurn();
+      render();
+      if (S.finished && !S.audit){ fetchAudit(); }
+      return fetchLive();
+    }).catch(function(){});
+}
+
+// ---------- 当前回合（还没产出动作时也要让页面有动静） ----------
+function updateCurrentTurn(){
+  var starts = [], acts = {};
+  S.events.forEach(function(e){
+    if (e.event === "turn_start") starts.push(e);
+    if (e.event === "action") acts[e.seat + "|" + e.context + "|" + e.day] = true;
+    if (e.event === "action_degraded") acts[e.seat + "|" + e.context + "|" + e.day] = true;
+  });
+  var last = starts[starts.length - 1];
+  if (!last){ S.current = null; return; }
+  var key = last.seat + "|" + last.context + "|" + last.day;
+  S.current = acts[key] ? null : last;
+}
+
+// ---------- 流式：逐块拉取"思考/作答"增量 ----------
+function fetchLive(){
+  if (!S.follow || !S.name) return Promise.resolve();
+  return api("/api/runs/" + encodeURIComponent(S.name) + "/live?offset=" + (S.liveOffset || 0))
+    .then(function(data){
+      if (!data.ok) return;
+      S.liveOffset = data.next_offset || S.liveOffset;
+      (data.events || []).forEach(applyDelta);
+      renderLive();
+    }).catch(function(){});
+}
+
+function applyDelta(d){
+  var key = d.seat + "|" + d.context + "|" + d.day;
+  if (!S.live || S.live.key !== key){
+    S.live = {key: key, seat: d.seat, context: d.context, day: d.day,
+              kind: d.kind, think: "", answer: "", attempt: 0};
+  }
+  if (d.kind === "reset"){
+    // 引擎在重试，前面那段思考作废，清空重来
+    S.live.think = "";
+    S.live.answer = "";
+    S.live.attempt = Number(d.text || 0) + 1;
+    return;
+  }
+  if (d.kind === "thinking") S.live.think += d.text || "";
+  else S.live.answer += d.text || "";
+  S.live.kind = d.kind;
+  // 对应的正式动作已经落盘 -> 说明这一回合结束了，清掉直播框
+  var done = S.events.some(function(e){
+    return e.event === "action" && e.seat === d.seat && e.context === d.context && e.day === d.day;
+  });
+  if (done) S.live = null;
+}
+
+function renderLive(){
+  var box = $("liveBox");
+  // 还没拿到任何增量，但已经有人在思考：显示"等待回应"，别让页面像死了一样
+  if (!S.live && S.current){
+    var cur = S.current;
+    var ctxName2 = {wolf_speak:"狼队密聊", night_wolf:"狼人决策", night_seer:"预言家查验",
+                    night_guard:"守卫守护", night_witch:"女巫用药", day_speak:"白天发言",
+                    day_vote:"投票", hunter:"猎人开枪"}[cur.context] || cur.context;
+    box.style.display = "block";
+    $("lvWho").textContent = cur.seat + "号";
+    $("lvPhase").textContent = ctxName2;
+    $("lvStatus").innerHTML = '等待模型首个 token<span class="caret"></span>';
+    $("lvThink").style.display = "none";
+    $("lvAnswer").style.display = "none";
+    return;
+  }
+  if (!S.live){ box.style.display = "none"; return; }
+  var ctxName = {wolf_speak:"狼队密聊", night_wolf:"狼人决策", night_seer:"预言家查验",
+                 night_guard:"守卫守护", night_witch:"女巫用药", day_speak:"白天发言",
+                 day_vote:"投票", hunter:"猎人开枪"}[S.live.context] || S.live.context;
+  box.style.display = "block";
+  $("lvWho").textContent = S.live.seat + "号";
+  $("lvPhase").textContent = ctxName;
+  $("lvStatus").innerHTML = S.live.kind === "thinking"
+    ? '正在思考<span class="caret"></span>' : '正在作答<span class="caret"></span>';
+  var think = $("lvThink"), ans = $("lvAnswer");
+  think.style.display = S.live.think ? "block" : "none";
+  think.textContent = "思考：" + S.live.think;
+  ans.style.display = S.live.answer ? "block" : "none";
+  ans.textContent = S.live.answer;
+}
+
+function fetchAudit(){
+  if (!S.name) return;
+  api("/api/runs/" + encodeURIComponent(S.name) + "/audit").then(function(data){
+    if (data.ok){ S.audit = data.report; renderAudit(); }
+  }).catch(function(){});
+}
+
+// ---------- 渲染 ----------
+function render(){
+  renderHeader();
+  renderSeats();
+  renderFeed();
+  renderBoard();
+  renderMetrics();
+}
+
+function renderHeader(){
+  var meta = S.events.filter(function(e){ return e.event === "run_meta"; })[0] || {};
+  var last = S.events[S.events.length - 1] || {};
+  var day = 0, phase = "—";
+  S.events.forEach(function(e){
+    if (e.event === "phase"){ day = e.day || day; phase = e.phase === "night" ? "夜晚" : "白天"; }
+    if (e.event === "game_end"){ phase = "已结束"; }
+  });
+  if (meta.theme_name){
+    S.themeName = meta.theme_name;
+    $("pageTitle").textContent = "「" + meta.theme_name + "」观察台";
+  }
+  if (meta.role_labels){ S.roleLabels = meta.role_labels; }
+  var players = meta.players || Object.keys(S.roles).length || 0;
+  $("metaChip").innerHTML = "对局 <b>" + esc(S.name || "—") + "</b>" +
+    (players ? " · <b>" + players + "</b> 人" : "") +
+    (meta.seed !== undefined ? " · seed <b>" + meta.seed + "</b>" : "") +
+    (meta.mode ? " · " + esc(meta.mode) : "");
+  if (last.event === "game_end"){
+    var w = last.winner === "werewolves" ? "狼人胜" : (last.winner === "good" ? "好人胜"
+      : (last.winner === "draw" ? "平局" : (last.winner || "")));
+    $("phaseChip").innerHTML = "共 <b>" + (last.days || day) + "</b> 天 · 已结束 · 胜方 <b>" +
+      esc(w) + "</b>";
+  } else {
+    $("phaseChip").innerHTML = "第 <b>" + day + "</b> " + esc(phase);
+  }
+}
+
+function seatStats(){
+  var st = {};
+  S.events.forEach(function(e){
+    if (e.event === "action" && e.seat){
+      var s = st[e.seat] = st[e.seat] || {speaks:0, votes:0, rejected:0, latency:[],
+                                          think:0, last:null};
+      if (e.context === "day_speak" && e.kind === "speak") s.speaks++;
+      if (e.context === "day_vote") s.votes++;
+      if (e.latency_ms) s.latency.push(e.latency_ms);
+      if (e.reasoning) s.think += e.reasoning.length;
+      s.last = e;
+    }
+    if (e.event === "action_rejected" && e.seat){
+      var r = st[e.seat] = st[e.seat] || {speaks:0, votes:0, rejected:0, latency:[],
+                                          think:0, last:null};
+      r.rejected++;
+    }
+  });
+  return st;
+}
+
+function deaths(){
+  var out = [];
+  S.events.forEach(function(e){
+    if (e.event === "night_resolve"){
+      (e.deaths || []).forEach(function(d){
+        out.push({seat: d.seat, cause: d.cause, role: d.role, day: e.day, phase: "夜"});
+      });
+    }
+    if (e.event === "elimination"){
+      out.push({seat: e.seat, cause: "vote", role: e.role, day: e.day, phase: "天"});
+    }
+    if (e.event === "hunter_shot" && e.target != null){
+      out.push({seat: e.target, cause: "hunter", role: e.role, day: e.day, phase: "天"});
+    }
+  });
+  return out;
+}
+
+var CAUSE_CN = {wolf:"被刀", poison:"被毒", vote:"被投出", hunter:"被枪",
+                guard_save_conflict:"同守同救"};
+
+function renderSeats(){
+  var st = seatStats();
+  var dead = {};
+  deaths().forEach(function(d){ dead[d.seat] = d; });
+  var seats = Object.keys(S.roles).map(Number).sort(function(a,b){ return a-b; });
+  if (!seats.length){ $("seatList").innerHTML = '<div class="empty">等待 role_layout…</div>'; return; }
+  var models = {};
+  S.events.forEach(function(e){
+    if (e.event === "action" && e.seat && e.model) models[e.seat] = e.model;
+  });
+  var lastSeat = null;
+  S.events.forEach(function(e){ if (e.event === "action" && e.seat) lastSeat = e.seat; });
+
+  $("seatList").innerHTML = seats.map(function(seat){
+    var s = st[seat] || {};
+    var d = dead[seat];
+    var cls = "seat" + (d ? " dead" : "") + (lastSeat === seat && !S.finished ? " active" : "") +
+      (S.filterSeat === seat ? " active" : "");
+    var lat = (s.latency && s.latency.length)
+      ? Math.round(s.latency.reduce(function(a,b){return a+b;},0) / s.latency.length) : 0;
+    return '<div class="' + cls + '" data-seat="' + seat + '">' +
+      '<div class="top"><span class="no">' + seat + "号</span>" +
+        roleBadge(roleOf(seat)) +
+        '<span class="model">' + esc(models[seat] || "") + '</span></div>' +
+      '<div class="sub">' +
+        (d ? '<span class="dead-tag">' + esc(d.phase + "出局·" + (CAUSE_CN[d.cause] || d.cause)) + '</span>'
+           : '<span>存活</span>') +
+        (s.speaks ? '<span>发言 ' + s.speaks + '</span>' : "") +
+        (s.votes ? '<span>投票 ' + s.votes + '</span>' : "") +
+        (s.rejected ? '<span style="color:#c0392b">非法 ' + s.rejected + '</span>' : "") +
+        (lat ? '<span>' + lat + 'ms</span>' : "") +
+      '</div></div>';
+  }).join("");
+}
+
+function actionLabel(e){
+  var ctx = e.context, kind = e.kind;
+  if (ctx === "night_wolf") return {cls:"kill", text:"刀 " + (e.target || "空刀")};
+  if (ctx === "night_guard") return {cls:"guard", text:"守 " + (e.target || "空守")};
+  if (ctx === "night_seer") return {cls:"check", text:"查 " + e.target};
+  if (ctx === "night_witch"){
+    if (kind === "save") return {cls:"save", text:"用解药救 " + (e.target || "")};
+    if (kind === "poison") return {cls:"poison", text:"用毒 " + (e.target || "")};
+    return {cls:"pass", text:"不用药"};
+  }
+  if (ctx === "day_vote") return {cls:"vote", text:"投票 " + (e.target || "弃权")};
+  if (ctx === "hunter") return {cls:"kill", text:"开枪 " + (e.target || "放弃")};
+  if (ctx === "day_speak") return {cls:"pass", text: kind === "speak" ? "发言" : "过"};
+  return {cls:"pass", text: kind || e.context};
+}
+
+function renderFeed(){
+  var feed = $("feed");
+  if (!S.events.length){
+    feed.innerHTML = '<div class="empty">该日志还没有事件。</div>';
+    return;
+  }
+  var html = [];
+  var openGroup = false;
+  var groupRows = [];
+  var dayLabel = "", phaseClass = "", phaseName = "";
+  var priv = false;
+
+  function flush(){
+    if (!openGroup) return;
+    html.push('<div class="daygroup"><div class="dayhead">' +
+      '<span class="badge ' + phaseClass + '">' + phaseName + '</span>' +
+      '<span class="dtitle">' + esc(dayLabel) + '</span>' +
+      (priv ? '<span class="badge priv">含私密信息</span>' : '') +
+      '</div><div class="rows">' + groupRows.join("") + '</div></div>');
+    openGroup = false; groupRows = []; priv = false;
+  }
+
+  S.events.forEach(function(e){
+    if (S.filterSeat && e.seat && e.seat !== S.filterSeat &&
+        !(e.event === "vote" && e.votes && e.votes[String(S.filterSeat)] !== undefined)) return;
+    if (e.event === "run_meta") return;
+
+    if (e.event === "phase"){
+      flush();
+      openGroup = true;
+      phaseClass = e.phase === "night" ? "night" : "day";
+      phaseName = e.phase === "night" ? "夜晚" : "白天";
+      dayLabel = "第 " + e.day + (e.phase === "night" ? " 夜" : " 天");
+      if (e.alive) dayLabel += " · 存活 " + e.alive.length + " 人";
+      return;
+    }
+    if (e.event === "role_layout") return;
+    if (!openGroup){ openGroup = true; phaseClass = "day"; phaseName = "开局"; dayLabel = ""; }
+
+    if (e.event === "action"){
+      // 狼人各自的意向合并到 wolf_kill 行；预言家合并到 seer_check 行
+      if (e.context === "night_wolf" || e.context === "night_seer") return;
+      // 狼队夜间密聊（仅狼可见，观察者可见）
+      if (e.context === "wolf_speak"){
+        priv = true;
+        if (e.kind !== "speak") return;
+        groupRows.push('<div class="row"><span class="who">' + e.seat + '号</span>' +
+          '<span class="act wolfchat">狼队密聊</span>' +
+          '<div class="txt"><div class="wolfline">' + esc(e.text || "") + '</div>' +
+          (S.think && e.reasoning
+            ? '<details class="think"><summary>' + e.reasoning.length + ' 字</summary>' +
+              '<div class="body">' + esc(e.reasoning) + '</div></details>' : "") +
+          '</div></div>');
+        return;
+      }
+      if (e.context === "day_speak" && e.kind === "speak"){
+        var roundTag = (e.round && e.round > 1)
+          ? '<span class="badge day" style="margin-right:6px">第' + e.round + '轮</span>' : "";
+        groupRows.push('<div class="row"><span class="who">' + e.seat + '号</span>' +
+          '<div class="txt"><div class="speech">' + roundTag + esc(e.text || "") +
+          '<button class="spk" data-speak="' + e.seq + '">播报</button></div>' +
+          (S.think && e.reasoning
+            ? '<details class="think"><summary>' + e.reasoning.length + ' 字</summary>' +
+              '<div class="body">' + esc(e.reasoning) + '</div></details>' : "") +
+          '</div></div>');
+        return;
+      }
+      var lab = actionLabel(e);
+      if (e.context === "night_seer" || e.context === "night_witch" || e.context === "night_guard") priv = true;
+      groupRows.push('<div class="row"><span class="who">' + e.seat + '号</span>' +
+        '<span class="act ' + lab.cls + '">' + esc(lab.text) + '</span>' +
+        (e.reason ? '<span class="txt" style="color:#8b93a1;font-size:12px">' + esc(e.reason) + '</span>' : "") +
+        (S.think && e.reasoning
+          ? '<details class="think"><summary>' + e.reasoning.length + ' 字</summary>' +
+            '<div class="body">' + esc(e.reasoning) + '</div></details>' : "") +
+        '</div>');
+      return;
+    }
+    if (e.event === "guard_action"){
+      priv = true;
+      return;   // 由 action(night_guard) 行展示，这里只标记含私密
+    }
+    if (e.event === "discussion_end"){
+      groupRows.push('<div class="resolve">讨论结束：' + (e.rounds || 0) + ' 轮 / ' +
+        (e.messages || 0) + ' 条发言（模式 ' + esc(e.mode || "one_round") + '）</div>');
+      return;
+    }
+    if (e.event === "wolf_chat_end"){
+      priv = true;
+      groupRows.push('<div class="resolve">狼队密聊结束：今夜 ' + (e.messages || 0) +
+        ' 条（' + (e.rounds || 0) + ' 轮）</div>');
+      return;
+    }
+    if (e.event === "wolf_kill"){
+      priv = true;
+      var wolfs = S.events.filter(function(x){
+        return x.event === "action" && x.context === "night_wolf" && x.day === e.day;
+      });
+      var detail = "";
+      if (wolfs.length){
+        detail = '<details class="think"><summary>' + wolfs.length + ' 名狼人各自的判断</summary>' +
+          '<div class="body">' + wolfs.map(function(w){
+            return w.seat + "号 → " + (w.target || "空刀") +
+              (w.reasoning ? "｜" + esc(w.reasoning) : "");
+          }).join("<br>") + '</div></details>';
+      }
+      groupRows.push('<div class="row"><span class="who">狼队</span>' +
+        '<span class="act kill">刀 ' + (e.target || "空刀") + '</span>' +
+        '<span class="txt" style="color:#8b93a1;font-size:12px">' +
+        (e.detail && e.detail.tied ? '（平票取座位号最小）' : '') + '</span>' + detail + '</div>');
+      return;
+    }
+    if (e.event === "seer_check"){
+      priv = true;
+      var seerAct = S.events.filter(function(x){
+        return x.event === "action" && x.context === "night_seer" &&
+          x.seat === e.seat && x.day === e.day;
+      })[0];
+      var think = (S.think && seerAct && seerAct.reasoning)
+        ? '<details class="think"><summary>' + seerAct.reasoning.length + ' 字</summary>' +
+          '<div class="body">' + esc(seerAct.reasoning) + '</div></details>' : "";
+      groupRows.push('<div class="row"><span class="who">' + e.seat + '号</span>' +
+        '<span class="act check">查 ' + e.target + ' → ' +
+        (e.is_wolf ? "狼人" : "好人") + '</span>' + think + '</div>');
+      return;
+    }
+    if (e.event === "night_resolve"){
+      var tags = [];
+      if (e.same_night_rescue){
+        tags.push("同守同救 → 该人死亡");
+      } else {
+        if (e.guarded) tags.push("守卫挡住");
+        if (e.saved) tags.push("女巫救回");
+      }
+      if (e.poisoned) tags.push("女巫用毒");
+      var ds = (e.deaths || []).map(function(d){
+        return d.seat + "号(" + (S.reveal ? (ROLE_SHORT[d.role] || "?") : "?") + "·" +
+          (CAUSE_CN[d.cause] || d.cause) + ")";
+      });
+      groupRows.push('<div class="resolve">夜晚结算：' +
+        (ds.length ? '<b>' + esc(ds.join("、")) + '</b>' : "平安夜") +
+        (tags.length ? ' ｜ ' + esc(tags.join("，")) : "") + '</div>');
+      return;
+    }
+    if (e.event === "vote" || e.event === "vote_revote"){
+      var votes = e.votes || {};
+      var chips = Object.keys(votes).sort(function(a,b){ return (+a) - (+b); }).map(function(k){
+        var v = votes[k];
+        return '<span class="v' + (v == null ? " abst" : "") + '">' + k + "→" + (v == null ? "弃" : v) + '</span>';
+      });
+      groupRows.push('<div class="resolve">' + (e.event === "vote" ? "投票" : "重投") +
+        '<div class="votegrid">' + chips.join("") + '</div></div>');
+      return;
+    }
+    if (e.event === "vote_tie"){
+      groupRows.push('<div class="resolve">平票：' + esc((e.top || []).join("、")) +
+        ' 号 → ' + esc(e.policy || "") + '</div>');
+      return;
+    }
+    if (e.event === "vote_quorum_failed"){
+      groupRows.push('<div class="resolve">票数不足：' + esc(e.detail || "") +
+        ' → 本轮无人出局</div>');
+      return;
+    }
+    if (e.event === "vote_tie_final"){
+      groupRows.push('<div class="resolve">再次平票，本轮无人出局</div>');
+      return;
+    }
+    if (e.event === "elimination"){
+      groupRows.push('<div class="resolve"><b>' + e.seat + '号出局</b>（' +
+        (e.reveal_role && S.reveal ? esc(ROLE_CN[e.role] || "") : "身份" + (S.reveal ? "" : "已隐藏")) +
+        '）</div>');
+      return;
+    }
+    if (e.event === "last_words"){
+      if (e.text){
+        groupRows.push('<div class="row lastwords"><span class="who">' + e.seat + '号</span>' +
+          '<span class="act" style="color:#7c3aed;background:#f3ecff">遗言</span>' +
+          '<div class="txt"><div class="speech" style="background:#faf7ff;border-color:#e6dcf7">' +
+          esc(e.text) + '</div></div></div>');
+      } else {
+        groupRows.push('<div class="resolve">' + e.seat + '号 没有留遗言</div>');
+      }
+      return;
+    }
+    if (e.event === "hunter_trigger"){
+      groupRows.push('<div class="resolve">猎人 ' + e.seat + '号 触发技能</div>');
+      return;
+    }
+    if (e.event === "hunter_shot"){
+      groupRows.push('<div class="resolve">猎人开枪 → ' + (e.target || "放弃") + '</div>');
+      return;
+    }
+    if (e.event === "action_rejected"){
+      groupRows.push('<div class="row"><span class="who">' + e.seat + '号</span>' +
+        '<span class="badge err">非法</span><span class="txt" style="font-size:12px">' +
+        esc(e.error || "") + '</span></div>');
+      return;
+    }
+    if (e.event === "action_degraded"){
+      groupRows.push('<div class="row"><span class="who">' + e.seat + '号</span>' +
+        '<span class="badge warn">降级</span><span class="txt" style="font-size:12px">' +
+        esc(e.error || "") + ' → ' + esc(e.fallback || "") + '</span></div>');
+      return;
+    }
+    if (e.event === "game_end"){
+      flush();
+      var w = e.winner === "werewolves" ? "狼人阵营胜"
+        : e.winner === "good" ? "好人阵营胜" : (e.winner === "draw" ? "平局" : e.winner);
+      html.push('<div class="endbanner">对局结束：' + esc(w) + '（共 ' + e.days + ' 天）</div>');
+      return;
+    }
+  });
+  flush();
+  feed.innerHTML = html.join("");
+}
+
+function renderBoard(){
+  var ds = deaths();
+  var alive = Object.keys(S.roles).map(Number).filter(function(s){
+    return !ds.some(function(d){ return d.seat === s; });
+  }).sort(function(a,b){ return a-b; });
+  var rows = [];
+  rows.push('<div class="kv"><span>存活</span><b>' + alive.length + ' / ' +
+    Object.keys(S.roles).length + '</b></div>');
+  if (S.reveal){
+    var cnt = {werewolf:0, villager:0, god:0};
+    alive.forEach(function(s){
+      var r = roleOf(s);
+      if (r === "werewolf") cnt.werewolf++;
+      else if (r === "villager") cnt.villager++;
+      else if (r) cnt.god++;
+    });
+    rows.push('<div class="kv"><span>存活狼 / 民 / 神</span><b>' + cnt.werewolf + ' / ' +
+      cnt.villager + ' / ' + cnt.god + '</b></div>');
+  }
+  rows.push('<div class="kv"><span>存活座位</span><b>' + (alive.join(" ") || "—") + '</b></div>');
+  var deadList = ds.map(function(d){
+    return d.seat + "号(" + d.phase + "·" + (CAUSE_CN[d.cause] || d.cause) + ")";
+  });
+  if (deadList.length){
+    rows.push('<div class="kv" style="align-items:flex-start"><span>出局</span>' +
+      '<b style="text-align:right;max-width:190px">' + esc(deadList.join("、")) + '</b></div>');
+  }
+  $("board").innerHTML = rows.join("");
+}
+
+function renderMetrics(){
+  var acts = S.events.filter(function(e){ return e.event === "action"; });
+  var rejected = S.events.filter(function(e){ return e.event === "action_rejected"; }).length;
+  var degraded = S.events.filter(function(e){ return e.event === "action_degraded"; }).length;
+  var parseFail = acts.reduce(function(a,e){ return a + (e.parse_fail || 0); }, 0);
+  var lat = acts.filter(function(e){ return e.latency_ms; }).map(function(e){ return e.latency_ms; });
+  var avg = lat.length ? Math.round(lat.reduce(function(a,b){return a+b;},0)/lat.length) : 0;
+  var thinkChars = acts.reduce(function(a,e){ return a + (e.reasoning ? e.reasoning.length : 0); }, 0);
+  var speaks = acts.filter(function(e){ return e.context === "day_speak" && e.kind === "speak"; }).length;
+
+  $("metrics").innerHTML = [
+    ["动作", acts.length], ["发言", speaks],
+    ["非法", rejected], ["降级", degraded],
+    ["解析失败", parseFail], ["平均延迟", avg ? avg + "ms" : "—"]
+  ].map(function(pair){
+    return '<div class="m"><div class="k">' + pair[0] + '</div><div class="v">' + pair[1] + '</div></div>';
+  }).join("");
+
+  var facts = [];
+  var stock = {};
+  S.events.forEach(function(e){
+    if (e.event === "night_resolve" && e.witch_stock) stock = e.witch_stock;
+  });
+  if (Object.keys(stock).length){
+    facts.push('<div class="kv"><span>女巫药剂剩余</span><b>解 ' + (stock.antidote||0) +
+      ' / 毒 ' + (stock.poison||0) + '</b></div>');
+  }
+  if (thinkChars){
+    facts.push('<div class="kv"><span>思考总量</span><b>' + thinkChars + ' 字</b></div>');
+  }
+  $("facts").innerHTML = facts.join("");
+}
+
+function renderAudit(){
+  var rep = S.audit;
+  if (!rep){ return; }
+  var html = [];
+  html.push(rep.ok ? '<div class="audit-ok">体检通过</div>'
+                   : '<div class="audit-bad">发现 ' + rep.errors.length + ' 处规则问题</div>');
+  var st = rep.stats || {};
+  html.push('<div class="kv"><span>规模</span><b>' + (st.players||"?") + ' 人 / ' +
+    (st.days||"?") + ' 天 / ' + (st.actions||"?") + ' 动作</b></div>');
+  if (st.end){
+    var wmap = {werewolves: "狼人胜", good: "好人胜", draw: "平局"};
+    html.push('<div class="kv"><span>结局</span><b>' +
+      esc(wmap[st.end.winner] || st.end.winner) + '</b></div>');
+  }
+  function list(title, items){
+    if (!items || !items.length) return;
+    html.push('<div style="margin-top:6px;font-size:12px;font-weight:600">' + title + '</div>');
+    html.push('<ul class="findings">' + items.map(function(x){
+      return '<li>' + esc(x) + '</li>';
+    }).join("") + '</ul>');
+  }
+  list("错误", rep.errors);
+  list("警告", rep.warnings);
+  list("提示", rep.infos);
+  $("audit").innerHTML = html.join("");
+}
+
+// ---------- 交互 ----------
+$("runSel").onchange = function(){ selectRun(this.value); };
+$("btnReload").onclick = function(){ loadRuns().then(function(){ if (S.name) { S.offset = 0;
+  S.events = []; S.roles = {}; S.finished = false; S.audit = null; poll(true); } }); };
+$("chkReveal").onchange = function(){ S.reveal = this.checked; render(); };
+$("chkThink").onchange = function(){ S.think = this.checked; renderFeed(); };
+$("chkFollow").onchange = function(){ S.follow = this.checked; };
+$("chkTts").onchange = function(){ S.tts = this.checked; if (S.tts) flushSpeechQueue(); };
+$("voiceSel").onchange = function(){ S.voice = this.value; };
+$("feed").addEventListener("click", function(ev){
+  var t = ev.target;
+  if (!t || !t.classList || !t.classList.contains("spk")) return;
+  var seq = t.getAttribute("data-speak");
+  var item = S.events.filter(function(e){ return String(e.seq) === String(seq); })[0];
+  if (!item) return;
+  t.classList.add("playing");
+  playSpeech(item.text || "", item.seat).then(function(){ t.classList.remove("playing"); });
+});
+$("seatList").onclick = function(ev){
+  var el = ev.target.closest ? ev.target.closest("[data-seat]") : null;
+  if (!el) return;
+  var seat = Number(el.getAttribute("data-seat"));
+  S.filterSeat = (S.filterSeat === seat) ? null : seat;
+  renderSeats(); renderFeed();
+};
+
+// 轮询
+loadRuns();
+setInterval(function(){ poll(false); }, 1500);
+setInterval(function(){ if (!S.finished) loadRuns(); }, 5000);
+</script>
+</body>
+</html>

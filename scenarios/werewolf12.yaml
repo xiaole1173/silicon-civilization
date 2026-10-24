@@ -1,0 +1,90 @@
+# 狼人杀 12 人标准局（4 狼 + 4 神 + 4 民）
+# 神职：预言家 / 女巫 / 猎人 / 守卫
+name: 12 人标准局
+players: 12
+
+# 情境设定：把机制包进拟真叙事（模型看到的是"处境"，不是"游戏规则"）
+theme:
+  name: 黑森林村
+  premise: |
+    你们是黑森林边缘这 12 名村民。近一个月，村里每到夜里就有人被咬死，
+    天亮只剩一具冰冷的尸体和门外的爪印——白天大家还一起吃饭，但没人知道谁是披着人皮的狼。
+    村里有 4 头狼人混在你们中间；也有人会查验、会用药、干过猎户、夜里守夜。
+    被咬死或被逐出村子，就是真的死了，不会重来。活下去，并找出狼。
+  roles:
+    werewolf: 狼人
+    seer: 预言家
+    witch: 女巫
+    hunter: 猎人
+    guard: 守卫
+    villager: 村民
+  phases:
+    night: 夜里
+    day: 白天
+
+roles:
+  werewolf: 4
+  seer: 1
+  witch: 1
+  hunter: 1
+  guard: 1
+  villager: 4
+
+witch:
+  antidote: 1
+  poison: 1
+  allow_self_save: true
+  same_night_potion: false
+  poison_can_hit_hunter: true
+
+hunter:
+  can_shoot_when_poisoned: false
+
+# 守卫：每晚可守一人（可守自己），不能连续两晚守同一人；
+# 与女巫解药同夜作用于同一人 -> 「同守同救」该人死亡
+guard:
+  enabled: true
+  # 同守同救（守卫与解药救同一人）：death = 该人死亡（主流规则）| survive = 存活
+  same_night_rescue: death
+  allow_self: true
+  no_repeat_consecutive: true
+
+vote:
+  simultaneous: true
+  # 有效票门槛：above_abstain = 得票须多于弃权票（默认，防止"一票出局"）
+  #              majority     = 须过半
+  #              plurality    = 只看相对多数（旧行为）
+  quorum: above_abstain
+  tie: revote_once
+  reveal_role_on_exit: true
+
+# 狼队夜间密聊：只有狼人能看到，商量刀谁（会影响对局质量，也是可配置的自变量）
+wolf_discussion:
+  enabled: true
+  rounds: 1          # 每晚几轮发言
+  max_chars: 120     # 单条密聊字数上限
+  see_previous_nights: false
+
+# 遗言：被投票出局可留遗言；夜里被杀的按 after_night（never / first_night / always）
+last_words:
+  enabled: true
+  after_vote: true
+  after_night: first_night
+  max_chars: 150
+
+speech:
+  order: seat
+  # one_round = 每人固定发一次言（默认，便于横向比较）
+  # free      = 轮流多轮，直到一整轮无人发言（由 agent 自己决定收尾）
+  mode: one_round
+  max_rounds: 3
+  max_chars: 220
+  passes_max: 1
+  include_transcript: -1     # -1 = 把全部历史发言都给模型（上下文拉满）
+
+win:
+  rule: side_elimination   # 屠边：狼全死好人胜；民全死或神全死狼胜
+  max_days: 8
+
+unsupported:
+  - sheriff     # 警长选举

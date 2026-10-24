@@ -1,0 +1,88 @@
+# 狼人杀规则预设（v1）
+# 设计原则：规则与判定全部在 engine 代码里，本文件只提供参数。
+# 修改这里不会改变机制，只改数值与开关。
+
+name: 标准 9 人局
+players: 9
+
+theme:
+  name: 山边村落
+  premise: |
+    你们是这个山边村落的 9 名村民。最近每到夜里就有人被咬死，天亮时村口留着爪印。
+    村里混进了 3 头狼人，白天它们和你一起干活、一起吃饭，夜里就现出原形。
+    村里有人会查验、懂用药、干过猎户、负责守夜。被咬死或逐出村子，就是真的死了。
+    活下去，并找出狼。
+  roles:
+    werewolf: 狼人
+    seer: 预言家
+    witch: 女巫
+    hunter: 猎人
+    guard: 守卫
+    villager: 村民
+  phases:
+    night: 夜里
+    day: 白天
+
+# 角色数量必须与 players 相等
+roles:
+  werewolf: 3      # 狼人
+  seer: 1          # 预言家
+  witch: 1         # 女巫（解药、毒药各一瓶，全局只能用一次）
+  hunter: 1        # 猎人（被狼刀或被投票出局时开枪，被毒死不能开枪）
+  villager: 3      # 平民
+
+# 女巫药剂：稀缺资源，全局一次性
+witch:
+  antidote: 1
+  poison: 1
+  allow_self_save: true      # 女巫能否救自己
+  same_night_potion: false   # 单夜能否同时用两瓶
+  poison_can_hit_hunter: true
+
+# 猎人
+hunter:
+  can_shoot_when_poisoned: false
+
+# 白天投票
+vote:
+  simultaneous: true
+  # 有效票门槛：above_abstain = 得票须多于弃权票（默认，防止"一票出局"）
+  #              majority     = 须过半
+  #              plurality    = 只看相对多数（旧行为）
+  quorum: above_abstain         # 同时投票，防跟票
+  tie: revote_once           # 平票处理：revote_once | no_elimination | lowest_seat
+  reveal_role_on_exit: true  # 出局是否翻牌
+
+# 发言
+# 狼队夜间密聊：只有狼人能看到，商量刀谁（会影响对局质量，也是可配置的自变量）
+wolf_discussion:
+  enabled: true
+  rounds: 1          # 每晚几轮发言
+  max_chars: 120     # 单条密聊字数上限
+  see_previous_nights: false
+
+# 遗言：被投票出局可留遗言；夜里被杀的按 after_night（never / first_night / always）
+last_words:
+  enabled: true
+  after_vote: true
+  after_night: first_night
+  max_chars: 150
+
+speech:
+  order: seat
+  # one_round = 每人固定发一次言（默认，便于横向比较）
+  # free      = 轮流多轮，直到一整轮无人发言（由 agent 自己决定收尾）
+  mode: one_round
+  max_rounds: 3                # seat | random | sheriff
+  max_chars: 220             # 单次发言字符上限（预算控制）
+  passes_max: 1              # 每人最多跳过几次
+  include_transcript: -1     # -1 = 把全部历史发言都给模型（上下文拉满）      # 给模型看最近几条公开发言
+
+# 胜负：屠边（狼人杀光全部平民 或 全部神职 即狼胜；狼全死则好人胜）
+win:
+  rule: side_elimination
+  max_days: 8                # 超过天数判定平局，防止无限循环
+
+# 未实现的能力显式声明，避免"配了但没生效"
+unsupported:
+  - sheriff     # 警长选举（守卫已实现）

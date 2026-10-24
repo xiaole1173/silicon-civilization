@@ -1,0 +1,506 @@
+"""Silicon Civilization · 本地服务（标准库实现，零依赖）
+
+启动：
+    python server/app.py            # 默认 http://127.0.0.1:8765
+    python server/app.py 9000       # 指定端口
+
+接口：
+    GET    /api/health                       服务与注册表健康状态
+    GET    /api/protocols                    支持的协议
+    GET    /api/providers                    提供商预设
+    GET    /api/models                       模型列表（key 已掩码）
+    POST   /api/models                       新增模型
+    GET    /api/models/{id}
+    PUT    /api/models/{id}                  更新（key 留空=保留原 key）
+    DELETE /api/models/{id}
+    POST   /api/models/{id}/test             连通性自检（真实发一次请求）
+    POST   /api/test-inline                  用请求体临时测连通（不写盘）
+"""
+from __future__ import annotations
+
+import json
+import mimetypes
+import os
+import queue
+import sys
+import time
+import urllib.parse
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(ROOT))
+
+import providers  # noqa: E402
+import store  # noqa: E402
+from engine.monitor import audit as audit_events  # noqa: E402
+from base import plugin as plugin_mod  # noqa: E402
+from base import runner as runner_mod  # noqa: E402
+
+RUNS_DIR = ROOT / "runs"
+TTS_DIR = ROOT / "data" / "tts_cache"
+TTS_SCRIPT = ROOT / "scripts" / "tts.ps1"
+DEFAULT_PAGE = "/web/models.html"
+PORT = int(os.environ.get("PORT", "8765"))
+HOST = os.environ.get("HOST", "127.0.0.1")
+
+
+def json_bytes(obj) -> bytes:
+    return json.dumps(obj, ensure_ascii=False).encode("utf-8")
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "SiliconCiv/0.2"
+    protocol_version = "HTTP/1.1"
+
+    # ---------- 基础工具 ----------
+    def log_message(self, fmt, *args):
+        sys.stderr.write("[%s] %s\n" % (self.log_date_time_string(), fmt % args))
+
+    def _send(self, status: int, body: bytes, content_type: str, extra: dict | None = None) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _json(self, status: int, obj) -> None:
+        self._send(status, json_bytes(obj), "application/json; charset=utf-8")
+
+    def _error(self, status: int, message: str, errors=None) -> None:
+        self._json(status, {"ok": False, "error": message, "errors": errors or []})
+
+    def _body(self) -> dict:
+        length = int(self.headers.get("Content-Length") or 0)
+        if length <= 0:
+            return {}
+        raw = self.rfile.read(length)
+        try:
+            data = json.loads(raw.decode("utf-8", "replace"))
+            return data if isinstance(data, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+
+    def _guard(self, fn, *args):
+        """统一异常出口：注册表坏了要明说，不能静默返回空列表。"""
+        try:
+            return fn(*args)
+        except store.StoreError as exc:
+            return self._error(500, str(exc))
+        except providers.ProviderError as exc:
+            return self._error(502, str(exc))
+        except Exception as exc:  # pragma: no cover
+            return self._error(500, "服务器内部错误：" + repr(exc))
+
+    # ---------- 路由 ----------
+    def do_OPTIONS(self):
+        self._send(204, b"", "text/plain", {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+        })
+
+    def do_GET(self):
+        path = urllib.parse.urlparse(self.path).path
+        if path.startswith("/api/"):
+            return self._guard(self._api_get, path)
+        return self._guard(self._static, path)
+
+    do_HEAD = do_GET
+
+    def do_POST(self):
+        path = urllib.parse.urlparse(self.path).path
+        return self._guard(self._api_post, path)
+
+    def do_PUT(self):
+        path = urllib.parse.urlparse(self.path).path
+        return self._guard(self._api_put, path)
+
+    def do_DELETE(self):
+        path = urllib.parse.urlparse(self.path).path
+        return self._guard(self._api_delete, path)
+
+    # ---------- API ----------
+    def _api_get(self, path: str):
+        if path == "/api/health":
+            return self._json(200, {"ok": True, "service": "silicon-civilization",
+                                    "time": store._now(), "store": store.store_health()})
+        if path == "/api/protocols":
+            return self._json(200, {"ok": True, "protocols": [
+                {"id": p, "label": providers.PROTOCOL_LABELS[p],
+                 "path": providers.PROTOCOL_PATHS[p]} for p in providers.PROTOCOLS]})
+        if path == "/api/providers":
+            return self._json(200, {"ok": True, "providers": providers.PRESETS})
+        if path == "/api/models":
+            return self._json(200, {"ok": True, "models": store.list_models()})
+        if path == "/api/runs":
+            return self._json(200, {"ok": True, "runs": self._list_runs()})
+        if path == "/api/plugins":
+            return self._json(200, {"ok": True, "plugins": plugin_mod.list_plugins()})
+        if path == "/api/sessions":
+            return self._json(200, {"ok": True, "sessions": runner_mod.list_sessions()})
+        parts = [p for p in path.split("/") if p]
+        if len(parts) >= 3 and parts[1] == "sessions":
+            sid = parts[2]
+            if len(parts) == 4 and parts[3] == "stream":
+                return self._stream_session(sid)
+            sess = runner_mod.get_session(sid)
+            if not sess:
+                return self._error(404, "会话不存在")
+            return self._json(200, {"ok": True, "session": sess.snapshot()})
+        if len(parts) >= 3 and parts[1] == "runs":
+            name = parts[2]
+            if len(parts) == 4 and parts[3] == "audit":
+                return self._audit_run(name)
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            try:
+                offset = int((query.get("offset") or ["0"])[0])
+            except ValueError:
+                offset = 0
+            if len(parts) == 4 and parts[3] == "live":
+                return self._read_live(name, offset)
+            return self._read_run(name, offset)
+        if len(parts) == 3 and parts[1] == "models":
+            model = store.get_model(parts[2])
+            if not model:
+                return self._error(404, "模型不存在")
+            return self._json(200, {"ok": True, "model": model})
+        return self._error(404, "未知接口")
+
+    # ---------- 对局日志 ----------
+    def _run_path(self, name: str) -> Path | None:
+        import re as _re
+        if not _re.fullmatch(r"[A-Za-z0-9._-]+.jsonl", name or ""):
+            return None
+        target = (RUNS_DIR / name).resolve()
+        try:
+            target.relative_to(RUNS_DIR.resolve())
+        except ValueError:
+            return None
+        return target if target.is_file() else None
+
+    def _list_runs(self):
+        out = []
+        if not RUNS_DIR.is_dir():
+            return out
+        for path in sorted(RUNS_DIR.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True):
+            info = {"name": path.name, "size": path.stat().st_size,
+                    "mtime": int(path.stat().st_mtime)}
+            try:
+                with path.open(encoding="utf-8") as fh:
+                    first = fh.readline()
+                meta = json.loads(first)
+                info.update({"seed": meta.get("seed"), "players": meta.get("players"),
+                             "scenario": meta.get("scenario"), "mode": meta.get("mode")})
+            except Exception:
+                pass
+            out.append(info)
+        return out
+
+    def _read_run(self, name: str, offset: int):
+        target = self._run_path(name)
+        if not target:
+            return self._error(404, "日志不存在")
+        size = target.stat().st_size
+        if offset > size:
+            offset = 0
+        with target.open("rb") as fh:
+            fh.seek(offset)
+            chunk = fh.read(2 * 1024 * 1024)          # 单次最多 2MB
+        consumed = 0
+        events = []
+        for raw in chunk.split(b"\n"):
+            if not raw.strip():
+                consumed += len(raw) + 1
+                continue
+            try:
+                events.append(json.loads(raw.decode("utf-8")))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                break                                  # 末尾不完整行，下次再读
+            consumed += len(raw) + 1
+        return self._json(200, {"ok": True, "events": events, "size": size,
+                                "next_offset": offset + min(consumed, len(chunk)),
+                                "finished": any(e.get("event") == "game_end" for e in events)})
+
+    def _read_live(self, name: str, offset: int):
+        """增量读取"逐块思考/回答"侧车日志，供页面做打字机效果。"""
+        base = name[:-6] if name.endswith(".jsonl") else name
+        target = (RUNS_DIR / (base + ".live.jsonl")).resolve()
+        try:
+            target.relative_to(RUNS_DIR.resolve())
+        except ValueError:
+            return self._error(403, "禁止访问该路径")
+        if not target.is_file():
+            return self._json(200, {"ok": True, "events": [], "size": 0,
+                                    "next_offset": 0, "finished": False})
+        size = target.stat().st_size
+        if offset > size:
+            offset = 0
+        with target.open("rb") as fh:
+            fh.seek(offset)
+            chunk = fh.read(1024 * 1024)
+        consumed = 0
+        events = []
+        for raw in chunk.split(b"\n"):
+            if not raw.strip():
+                consumed += len(raw) + 1
+                continue
+            try:
+                events.append(json.loads(raw.decode("utf-8")))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                break
+            consumed += len(raw) + 1
+        return self._json(200, {"ok": True, "events": events, "size": size,
+                                "next_offset": offset + min(consumed, len(chunk))})
+
+    def _audit_run(self, name: str):
+        target = self._run_path(name)
+        if not target:
+            return self._error(404, "日志不存在")
+        events = []
+        with target.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return self._json(200, {"ok": True, "report": audit_events(events)})
+
+    def _api_post(self, path: str):
+        parts = [p for p in path.split("/") if p]
+        if path == "/api/models":
+            model, errors = store.create_model(self._body())
+            if errors:
+                return self._error(400, "；".join(errors), errors)
+            return self._json(201, {"ok": True, "model": model})
+        if len(parts) == 4 and parts[1] == "models" and parts[3] == "test":
+            return self._test(parts[2])
+        if path == "/api/test-inline":
+            return self._test_inline()
+        if path == "/api/tts":
+            return self._tts()
+        if path == "/api/sessions":
+            return self._create_session()
+        return self._error(404, "未知接口")
+
+    # ---------- 基座：会话 ----------
+    def _create_session(self):
+        body = self._body()
+        plugin = plugin_mod.get_plugin(str(body.get("plugin") or ""))
+        if not plugin:
+            return self._error(400, "插件不存在：" + str(body.get("plugin")))
+        seats_in = body.get("seats") or []
+        if not seats_in:
+            return self._error(400, "至少需要一个座位")
+        seats = []
+        for idx, seat in enumerate(seats_in, start=1):
+            model_id = str(seat.get("model_id") or "")
+            conf = store.get_model(model_id, with_secret=True)
+            if not conf:
+                return self._error(400, "座位 {} 的模型不存在：{}".format(idx, model_id))
+            seats.append({
+                "name": str(seat.get("name") or "{}号".format(idx)),
+                "model_conf": conf,
+                "persona": str(seat.get("persona") or ""),
+            })
+        sid = "s" + time.strftime("%m%d-%H%M%S")
+        session = runner_mod.create_session(
+            sid, plugin, body.get("config") or {}, seats,
+            title=str(body.get("title") or plugin.name))
+        runner_mod.start(session)
+        return self._json(201, {"ok": True, "session": session.snapshot(),
+                                "stream": "/api/sessions/{}/stream".format(sid)})
+
+    def _sse(self, event: dict) -> bool:
+        """写一条 SSE 事件；返回 False 表示客户端断开。"""
+        try:
+            payload = "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
+            self.wfile.write(payload.encode("utf-8"))
+            self.wfile.flush()
+            return True
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return False
+
+    def _stream_session(self, sid: str):
+        sess = runner_mod.get_session(sid)
+        if not sess:
+            return self._error(404, "会话不存在")
+        q = sess.broker.subscribe()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "close")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        head = sess.snapshot()
+        head.pop("messages", None)
+        if not self._sse({"type": "snapshot", **head}):
+            sess.broker.unsubscribe(q)
+            return
+        for m in sess.messages:
+            if not self._sse({"type": "message_start", "message": m.to_dict()}):
+                sess.broker.unsubscribe(q)
+                return
+            if m.text or m.thinking:
+                self._sse({"type": "message_end", "id": m.id, "text": m.text,
+                           "thinking": m.thinking, "meta": m.meta})
+
+        try:
+            while True:
+                try:
+                    event = q.get(timeout=15)
+                except queue.Empty:
+                    if not self._sse({"type": "ping", "ts": int(time.time())}):
+                        break
+                    continue
+                if not self._sse(event):
+                    break
+                if event.get("type") == "session" and event.get("state") in ("ended", "closed"):
+                    break
+        finally:
+            sess.broker.unsubscribe(q)
+            self.close_connection = True
+
+    def _api_put(self, path: str):
+        parts = [p for p in path.split("/") if p]
+        if len(parts) == 3 and parts[1] == "models":
+            model, errors, kind = store.update_model(parts[2], self._body())
+            if kind == "missing":
+                return self._error(404, "模型不存在")
+            if errors:
+                return self._error(400, "；".join(errors), errors)
+            return self._json(200, {"ok": True, "model": model})
+        return self._error(404, "未知接口")
+
+    def _api_delete(self, path: str):
+        parts = [p for p in path.split("/") if p]
+        if len(parts) == 3 and parts[1] == "models":
+            if not store.delete_model(parts[2]):
+                return self._error(404, "模型不存在")
+            return self._json(200, {"ok": True})
+        return self._error(404, "未知接口")
+
+    def _test(self, model_id: str):
+        conf = store.get_model(model_id, with_secret=True)
+        if not conf:
+            return self._error(404, "模型不存在")
+        result = providers.test_model(conf)
+        store.record_test(model_id, result)
+        return self._json(200, {"ok": True, "result": result})
+
+    def _test_inline(self):
+        payload = self._body()
+        conf = {
+            "name": str(payload.get("name") or "inline"),
+            "protocol": str(payload.get("protocol") or providers.PROTOCOLS[0]),
+            "api_base": str(payload.get("api_base") or "").strip(),
+            "model": str(payload.get("model") or "").strip(),
+            "api_key": str(payload.get("api_key") or ""),
+            "api_key_env": str(payload.get("api_key_env") or ""),
+            "temperature": payload.get("temperature", 0),
+            "max_tokens": payload.get("max_tokens", 16),
+        }
+        if not conf["api_base"] or not conf["model"]:
+            return self._error(400, "Base URL 和模型名必填")
+        result = providers.test_model(conf)
+        return self._json(200, {"ok": True, "result": result})
+
+    # ---------- 语音合成 ----------
+    VOICES = {
+        "kangkang": "Microsoft Kangkang",
+        "huihui": "Microsoft Huihui",
+        "yaoyao": "Microsoft Yaoyao",
+        "zira": "Microsoft Zira Desktop",
+    }
+
+    def _tts(self):
+        """把一段文字合成为 WAV（Windows SAPI，本地离线，零下载）。结果按内容哈希缓存。"""
+        body = self._body()
+        text = str(body.get("text") or "").strip()
+        if not text:
+            return self._error(400, "text 不能为空")
+        text = text[:600]
+        voice_key = str(body.get("voice") or "kangkang").strip().lower()
+        voice = self.VOICES.get(voice_key, self.VOICES["kangkang"])
+        try:
+            rate = int(body.get("rate") or 0)
+        except (TypeError, ValueError):
+            rate = 0
+        rate = max(-10, min(10, rate))
+
+        import hashlib
+        digest = hashlib.md5((text + "|" + voice + "|" + str(rate)).encode("utf-8")).hexdigest()
+        TTS_DIR.mkdir(parents=True, exist_ok=True)
+        target = TTS_DIR / (digest + ".wav")
+        if not target.is_file():
+            tmp_txt = TTS_DIR / (digest + ".txt")
+            tmp_txt.write_text(text, encoding="utf-8")
+            try:
+                import subprocess
+                proc = subprocess.run(
+                    ["pwsh", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(TTS_SCRIPT),
+                     "-TextFile", str(tmp_txt), "-OutFile", str(target),
+                     "-VoiceName", voice, "-Rate", str(rate)],
+                    capture_output=True, timeout=60,
+                )
+            except Exception as exc:
+                return self._error(500, "语音合成失败：{}".format(exc))
+            finally:
+                try:
+                    tmp_txt.unlink()
+                except Exception:
+                    pass
+            if proc.returncode != 0 or not target.is_file():
+                detail = (proc.stderr or b"").decode("utf-8", "replace")[:300]
+                return self._error(500, "语音合成失败（SAPI 返回 {}）：{}".format(proc.returncode, detail))
+        data = target.read_bytes()
+        return self._send(200, data, "audio/wav", {"Cache-Control": "public, max-age=86400"})
+
+    # ---------- 静态文件 ----------
+    def _static(self, path: str):
+        if path in ("/", "/index.html"):
+            path = DEFAULT_PAGE
+        rel = urllib.parse.unquote(path.lstrip("/"))
+        target = (ROOT / rel).resolve()
+        try:
+            target.relative_to(ROOT)
+        except ValueError:
+            return self._error(403, "禁止访问该路径")
+        if target.is_dir():
+            target = target / "index.html"
+        if not target.is_file():
+            return self._error(404, "文件不存在：" + rel)
+        ctype = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        if ctype.startswith("text/") or ctype in ("application/javascript", "application/json"):
+            ctype += "; charset=utf-8"
+        self._send(200, target.read_bytes(), ctype)
+
+
+def main() -> None:
+    port = PORT
+    if len(sys.argv) > 1:
+        try:
+            port = int(sys.argv[1])
+        except ValueError:
+            pass
+    server = ThreadingHTTPServer((HOST, port), Handler)
+    print("Silicon Civilization server running at http://%s:%d" % (HOST, port))
+    print("  model manager : http://%s:%d/web/models.html" % (HOST, port))
+    print("  replay board  : http://%s:%d/viz/index.html" % (HOST, port))
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nstopped")
+
+
+if __name__ == "__main__":
+    main()

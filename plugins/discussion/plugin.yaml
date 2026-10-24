@@ -1,0 +1,7 @@
+id: discussion
+name: 圆桌讨论
+description: 让多个模型就同一个话题轮流发言，验证基座的上下文、流式与显示。
+default_config:
+  topic: 如果只能保留一种公共资源，应该保留什么？
+  rounds: 2
+  max_chars: 120
