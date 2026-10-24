@@ -289,6 +289,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._tts()
         if path == "/api/sessions":
             return self._create_session()
+        parts = [p for p in path.split("/") if p]
+        if len(parts) == 4 and parts[1] == "sessions" and parts[3] == "stop":
+            ok = runner_mod.stop_session(parts[2], "用户手动结束")
+            if not ok:
+                return self._error(404, "会话不存在")
+            return self._json(200, {"ok": True, "stopped": parts[2]})
         return self._error(404, "未知接口")
 
     # ---------- 基座：会话 ----------

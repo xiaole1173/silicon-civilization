@@ -164,6 +164,10 @@ class WerewolfPlugin(BaseScenario):
         rounds_per_day = max(1, int(self._cfg(session).get("rounds_per_day") or 1))
 
         while True:
+            if session.stopped:
+                session.referee("已停止，本局到此结束。")
+                session.end("stopped")
+                return
             st.day += 1
             st.phase = "night"
             session.meta["turn"] = st.day
@@ -573,6 +577,8 @@ class WerewolfPlugin(BaseScenario):
 
     def _act(self, session, seat: int, context: str, instruction: str,
              channel: str | None = None, round_id: str = "") -> dict:
+        if session.stopped:
+            return {"kind": "pass"}
         st = self._state(session)
         self._sync_alive(session)
         agent = session.agents.get(seat)

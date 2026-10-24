@@ -31,6 +31,14 @@ def get_session(session_id: str) -> Session | None:
         return _SESSIONS.get(session_id)
 
 
+def stop_session(session_id: str, reason: str = "") -> bool:
+    session = get_session(session_id)
+    if not session:
+        return False
+    session.stop(reason)
+    return True
+
+
 def list_sessions() -> list:
     with _LOCK:
         items = list(_SESSIONS.values())

@@ -58,6 +58,7 @@ class Session:
         self.rounds: list[dict] = []
         self.broker = Broker()
         self.state = "created"
+        self.stopped = False
         self.winner = None
         self.meta: dict = {}
         self.started_at = time.time()
@@ -232,6 +233,14 @@ class Session:
     def narrate_private(self, text: str) -> Message:
         """观察者可见、模型不可见的旁白（身份、结算细节等，防泄漏）。"""
         return self.add_message(OBSERVER, None, kind="system", text=text)
+
+    def stop(self, reason: str = "") -> None:
+        """请求结束对局：插件在下一个回合边界退出。"""
+        if self.stopped:
+            return
+        self.stopped = True
+        self.referee("对局被手动结束。{}".format(("原因：" + reason) if reason else ""))
+        self._publish({"type": "session", "state": "ending", "reason": reason})
 
     def publish_state(self) -> None:
         """把存活/警长等对局状态推给观察者（模型看不到，只用于界面）。"""
