@@ -142,7 +142,7 @@ class Session:
     # ---------- 调用模型（流式 + 事实卡 + 校验重说） ----------
     def ask(self, agent: Agent, instruction: str, channel: str = PUBLIC,
             kind: str = "speak", budget: int = 2048, temperature: float | None = None,
-            timeout: float = 240.0, label: str = "", validator=None,
+            timeout: float = 600.0, label: str = "", validator=None,
             retries: int = 2, facts: dict | None = None, round_id: str = "") -> Message | None:
         """让某个 agent 说话：装配上下文 → 流式生成 → 校验 → 不合格就带着原因重说。"""
         from base.context import build as build_context
