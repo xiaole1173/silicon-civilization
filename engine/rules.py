@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from .scenario import GOD_ROLES
+from .scenario import GOD_ROLES, WOLF_ROLES
 from .state import WOLF, GameState
 
 
@@ -15,7 +15,11 @@ CONTEXT_ROLE = {
     "night_seer": "seer",
     "night_witch": "witch",
     "night_guard": "guard",
+    "wolf_king": "wolf_king",
 }
+
+# 狼阵营专属语境：狼王与狼人共用
+WOLF_CONTEXTS = {"wolf_speak", "night_wolf", "wolf_destruct"}
 
 
 def is_wolf_role(role: str) -> bool:
@@ -47,8 +51,11 @@ def validate_action(state: GameState, seat: int, action: dict, *, context: str) 
         return False, "座位 {} 已出局，不能行动".format(seat)
     expected_role = CONTEXT_ROLE.get(context)
     if expected_role and state.role_of(seat) != expected_role:
-        return False, "座位 {} 的身份是 {}，不能执行 {} 动作".format(
-            seat, state.role_of(seat) or "未知", expected_role)
+        # 狼阵营语境对狼王与狼人通用
+        wolf_ok = context in WOLF_CONTEXTS and state.role_of(seat) in WOLF_ROLES
+        if not wolf_ok:
+            return False, "座位 {} 的身份是 {}，不能执行 {} 动作".format(
+                seat, state.role_of(seat) or "未知", expected_role)
 
     kind = str(action.get("kind") or "").strip()
     if not kind:
@@ -112,6 +119,20 @@ def validate_action(state: GameState, seat: int, action: dict, *, context: str) 
             return _check_target(state, action, seat, allow_self=False, context="女巫毒药")
         return True, ""
 
+    if context == "sheriff_vote":
+        if kind not in ("vote", "abstain"):
+            return False, "警长竞选只能 vote 或 abstain"
+        if kind == "vote":
+            return _check_target(state, action, seat, allow_self=False, context="警长投票")
+        return True, ""
+
+    if context == "wolf_destruct":
+        if state.role_of(seat) not in WOLF_ROLES:
+            return False, "只有狼人才能自爆"
+        if kind not in ("destruct", "pass"):
+            return False, "自爆阶段只能 destruct 或 pass"
+        return True, ""
+
     if context == "day_vote":
         if seat in state.revealed:
             return False, "你已经翻牌，没有投票权了"
@@ -151,6 +172,13 @@ def validate_action(state: GameState, seat: int, action: dict, *, context: str) 
         # 软上限：略超不惩罚（只记录 overlong），4 倍以上才视为输出失控
         if len(text) > limit * 4:
             return False, "发言异常过长（超过 {} 字，疑似输出失控）".format(limit * 4)
+        return True, ""
+
+    if context == "wolf_king":
+        if kind not in ("shoot", "pass"):
+            return False, "狼王只能 shoot 或 pass"
+        if kind == "shoot":
+            return _check_target(state, action, seat, allow_self=False, context="狼王开枪")
         return True, ""
 
     if context == "hunter":
@@ -269,6 +297,13 @@ def resolve_vote_death(state: GameState, seat: int) -> dict:
     return {"died": True, "revealed": False, "seat": seat, "role": state.role_of(seat)}
 
 
+def can_wolf_king_shoot(state: GameState, seat: int, cause: str) -> bool:
+    """狼王：被投出或被带走时可开枪；被毒杀不能。"""
+    if state.role_of(seat) != "wolf_king":
+        return False
+    return cause != "poison"
+
+
 def can_hunter_shoot(state: GameState, seat: int, cause: str) -> bool:
     if state.role_of(seat) != "hunter":
         return False
@@ -278,13 +313,15 @@ def can_hunter_shoot(state: GameState, seat: int, cause: str) -> bool:
 
 
 # ---------------- 白天 ----------------
-def tally_votes(votes: dict[int, int | None]) -> dict:
-    """返回 {tally, abstain, voters, top, tie, eliminated}。"""
-    tally: dict[int, int] = {}
+def tally_votes(votes: dict[int, int | None], weights: dict | None = None) -> dict:
+    """计票，支持加权（警长 1.5 票）。返回 {tally, abstain, voters, top, tie, eliminated}。"""
+    tally: dict[int, float] = {}
     abstain = 0
-    for target in votes.values():
+    weights = weights or {}
+    for voter, target in votes.items():
         if target:
-            tally[int(target)] = tally.get(int(target), 0) + 1
+            w = float(weights.get(voter, 1.0))
+            tally[int(target)] = tally.get(int(target), 0.0) + w
         else:
             abstain += 1
     base = {"tally": tally, "abstain": abstain, "voters": len(votes)}

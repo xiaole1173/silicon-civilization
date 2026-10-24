@@ -51,6 +51,14 @@ wolf_discussion:
   rounds: 1
   max_chars: 120
 
+sheriff:
+  enabled: true
+  vote_weight: 1.5
+  speaks_last: true
+
+wolf_self_destruct:
+  enabled: true
+
 vote:
   simultaneous: true
   quorum: above_abstain
@@ -76,5 +84,5 @@ win:
   max_days: 8
 
 unsupported:
-  - sheriff          # 警长竞选（官方标准场有，本实现未做）
-  - wolf_self_destruct  # 狼人自爆
+  - sheriff_badge_flow   # 警徽流（警长死亡移交）
+  - wolf_king            # 狼王（见 werewolf12_wolfking.yaml）

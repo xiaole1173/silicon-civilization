@@ -14,13 +14,16 @@ def render_facts(session, agent, extra: dict | None = None) -> str:
     if round_no:
         lines.append("· 现在是第 {} 轮".format(round_no))
 
-    alive = sorted(session.agents.keys())
-    lines.append("· 在场：{}".format("、".join("{}（{}）".format(i, session.agents[i].name)
-                                             for i in alive)))
-
     facts = dict(getattr(session.scenario, "facts", lambda s, a: {})(session, agent) or {})
     if extra:
         facts.update(extra)
+
+    # 只有插件没提供"在场"时，才用会话里的全员兜底（否则会出现两份名单，
+    # 而且兜底那份会把已出局的也算进去）
+    if "在场" not in facts:
+        allowed = session.alive_ids() if hasattr(session, "alive_ids") else sorted(session.agents)
+        lines.append("· 在场：{}".format("、".join("{}（{}）".format(i, session.agents[i].name)
+                                                 for i in allowed)))
 
     for key, value in facts.items():
         if value in (None, "", [], {}):

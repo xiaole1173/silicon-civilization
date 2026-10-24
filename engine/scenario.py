@@ -10,7 +10,9 @@ try:
 except ImportError:  # pragma: no cover
     yaml = None
 
-SUPPORTED_ROLES = ("werewolf", "seer", "witch", "hunter", "guard", "idiot", "villager")
+SUPPORTED_ROLES = ("werewolf", "wolf_king", "seer", "witch", "hunter",
+                   "guard", "idiot", "villager")
+WOLF_ROLES = ("werewolf", "wolf_king")
 GOOD_ROLES = ("seer", "witch", "hunter", "guard", "idiot", "villager")
 GOD_ROLES = ("seer", "witch", "hunter", "guard", "idiot")
 
@@ -29,6 +31,8 @@ class Scenario:
     guard: dict = field(default_factory=dict)
     wolf_discussion: dict = field(default_factory=dict)
     last_words: dict = field(default_factory=dict)
+    sheriff: dict = field(default_factory=dict)
+    wolf_self_destruct: dict = field(default_factory=dict)
     vote: dict = field(default_factory=dict)
     speech: dict = field(default_factory=dict)
     win: dict = field(default_factory=dict)
@@ -57,6 +61,8 @@ class Scenario:
             guard=dict(data.get("guard") or {}),
             wolf_discussion=dict(data.get("wolf_discussion") or {}),
             last_words=dict(data.get("last_words") or {}),
+            sheriff=dict(data.get("sheriff") or {}),
+            wolf_self_destruct=dict(data.get("wolf_self_destruct") or {}),
             vote=dict(data.get("vote") or {}),
             speech=dict(data.get("speech") or {}),
             win=dict(data.get("win") or {}),
@@ -119,6 +125,12 @@ class Scenario:
         self.last_words.setdefault("max_chars", 150)
         if self.last_words["after_night"] not in ("never", "first_night", "always"):
             raise ScenarioError("last_words.after_night 只能是 never / first_night / always")
+        # 警长：首日投票选出，票权 1.5，白天最后发言
+        self.sheriff.setdefault("enabled", False)
+        self.sheriff.setdefault("vote_weight", 1.5)
+        self.sheriff.setdefault("speaks_last", True)
+        # 狼人自爆：白天可自爆，直接进入黑夜（跳过当天投票）
+        self.wolf_self_destruct.setdefault("enabled", False)
         self.speech.setdefault("passes_max", 1)
         self._init_theme()
         self.win.setdefault("rule", "side_elimination")
@@ -138,6 +150,7 @@ class Scenario:
         "hunter": "猎人",
         "guard": "守卫",
         "idiot": "白痴",
+        "wolf_king": "狼王",
         "villager": "村民",
     }
 
@@ -182,6 +195,8 @@ class Scenario:
             "guard": dict(self.guard),
             "wolf_discussion": dict(self.wolf_discussion),
             "last_words": dict(self.last_words),
+            "sheriff": dict(self.sheriff),
+            "wolf_self_destruct": dict(self.wolf_self_destruct),
             "theme": dict(self.theme),
             "vote": dict(self.vote),
             "speech": dict(self.speech),

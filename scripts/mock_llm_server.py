@@ -59,6 +59,12 @@ def choose(user_text: str):
     if "【日间·表决】" in user_text:
         return ({"kind": "vote", "target": first, "reason": "压力位"},
                 "把票集中在 {} 号身上，逼他表态。".format(first))
+    if "【日间·警长竞选】" in user_text:
+        return ({"kind": "vote", "target": alive[0] if alive else 1}, "选个看起来可信的。")
+    if "【日间·自爆声明】" in user_text:
+        return ({"kind": "pass"}, "现在还不是自爆的时候。")
+    if "【出局·狼王反制】" in user_text:
+        return ({"kind": "pass"}, "先不带走人。")
     if "【出局·反制】" in user_text:
         return ({"kind": "pass"}, "没有把握，先不开枪。")
     # 非狼人杀场景（例如圆桌讨论）：直接给一段自然语言

@@ -27,6 +27,7 @@ BUDGET = {
     "wolf_speak": 1024, "night_wolf": 1024, "night_seer": 1024,
     "night_guard": 1024, "night_witch": 1536, "day_speak": 2048,
     "day_vote": 1024, "hunter": 768, "last_words": 1024,
+    "sheriff_vote": 1024, "wolf_destruct": 768,
 }
 
 
@@ -47,6 +48,7 @@ class WerewolfPlugin(BaseScenario):
         "hunter": "被狼杀或被票出时可以开枪带走一人；被毒杀不能开枪。",
         "guard": "每夜可以守一个人，不能连续两晚守同一人。",
         "idiot": "被投票放逐会翻牌免死，但此后失去投票权。",
+        "wolf_king": "你是狼王：被投出或被带走时能开枪带走一人；被毒杀不能。",
         "villager": "没有特殊能力，只能靠陈述和表决找狼。",
     }
 
@@ -94,7 +96,7 @@ class WerewolfPlugin(BaseScenario):
         if deaths:
             out["昨夜出局"] = ["{}号（{}）".format(d["seat"], self._role_label(session, d.get("role", "")))
                               for d in deaths]
-        if role == "werewolf":
+        if st.is_wolf(seat):
             mates = [s for s in st.alive_wolves() if s != seat]
             if mates:
                 out["你的同伴"] = ["{}号".format(s) for s in mates]
@@ -232,12 +234,7 @@ class WerewolfPlugin(BaseScenario):
 
             # 猎人
             for d in list(deaths):
-                if d["cause"] == "wolf" and rules.can_hunter_shoot(st, d["seat"], d["cause"]):
-                    action = self._act(session, d["seat"], "hunter", "你已出局，可以开枪带走一人。")
-                    shot = self._pick_target(session, d["seat"], action) if action.get("kind") == "shoot" else None
-                    if shot is not None:
-                        rules.apply_deaths(st, [{"seat": shot, "cause": "hunter"}])
-                        session.narrate("猎人 {}号 开枪带走 {}号".format(d["seat"], shot))
+                self._death_trigger(session, d["seat"], d["cause"])
 
             winner = rules.check_win(st)
             if winner:
@@ -246,8 +243,24 @@ class WerewolfPlugin(BaseScenario):
             # ---------- 白天 ----------
             st.phase = "day"
             session.narrate("第 {} 天".format(st.day))
+
+            sheriff_conf = sc.sheriff or {}
+            if st.day == 1 and sheriff_conf.get("enabled"):
+                self._elect_sheriff(session)
+
+            if (sc.wolf_self_destruct or {}).get("enabled") and st.alive_wolves():
+                if self._try_self_destruct(session):
+                    continue      # 自爆成功：当天直接结束，进入下一夜
+
+            order = sorted(st.alive)
+            if sheriff_conf.get("speaks_last", True) and st.sheriff in order:
+                order.remove(st.sheriff)
+                order.append(st.sheriff)
+
             for rnd in range(1, rounds_per_day + 1):
-                for seat in sorted(st.alive):
+                for seat in order:
+                    if seat not in st.alive:
+                        continue
                     self._act(session, seat, "day_speak",
                               "第 {} 天，轮到你陈述（第 {} 轮）。".format(st.day, rnd))
 
@@ -261,11 +274,7 @@ class WerewolfPlugin(BaseScenario):
                 rules.apply_deaths(st, [{"seat": eliminated, "cause": "vote"}])
                 session.narrate("{}号被逐出（身份：{}）".format(
                     eliminated, self._role_label(session, st.role_of(eliminated))))
-                if rules.can_hunter_shoot(st, eliminated, "vote"):
-                    action = self._act(session, eliminated, "hunter", "你被逐出，可以开枪带走一人。")
-                    shot2 = self._pick_target(session, eliminated, action) if action.get("kind") == "shoot" else None
-                    if shot2 is not None:
-                        rules.apply_deaths(st, [{"seat": shot2, "cause": "hunter"}])
+                self._death_trigger(session, eliminated, "vote")
                 if (sc.last_words or {}).get("after_vote", True):
                     self._act(session, eliminated, "last_words",
                               "你被逐出，这是你最后一次开口（所有人都会听到）。")
@@ -311,6 +320,62 @@ class WerewolfPlugin(BaseScenario):
             return None
         return second["eliminated"]
 
+    def _elect_sheriff(self, session) -> None:
+        """首日警长竞选：全员投票（不能投自己），平票则本局无警长。"""
+        st = self._state(session)
+        conf = self._scenario(session).sheriff or {}
+        session.narrate("警长竞选开始（警长票权 {}，白天最后发言）".format(
+            conf.get("vote_weight", 1.5)))
+        votes = {}
+        for seat in sorted(st.alive):
+            action = self._act(session, seat, "sheriff_vote", "选出你认为最可信的人当警长。")
+            target = self._as_target(action) if action.get("kind") == "vote" else None
+            if target == seat or target not in st.alive:
+                target = None
+            votes[seat] = target
+        result = rules.tally_votes(votes)
+        detail = "，".join("{}号{}票".format(s, int(v) if v == int(v) else v)
+                          for s, v in sorted(result["tally"].items(),
+                                             key=lambda kv: (-kv[1], kv[0])))
+        if not result["top"] or result["tie"]:
+            session.narrate("警长竞选平票 → 本局没有警长（票型：{}｜弃权 {}）".format(
+                detail or "无", result["abstain"]))
+            return
+        st.sheriff = result["top"][0]
+        session.narrate("{}号当选警长（票型：{}｜弃权 {}）".format(
+            st.sheriff, detail, result["abstain"]))
+
+    def _try_self_destruct(self, session) -> bool:
+        """狼人自爆：直接进入黑夜，当天不投票。"""
+        st = self._state(session)
+        for seat in sorted(st.alive_wolves()):
+            action = self._act(session, seat, "wolf_destruct", "要不要现在自爆？")
+            if action.get("kind") == "destruct":
+                rules.apply_deaths(st, [{"seat": seat, "cause": "destruct"}])
+                session.narrate("{}号狼人自爆！当天不再陈述与投票，直接进入黑夜".format(seat))
+                return True
+        return False
+
+    def _death_trigger(self, session, seat: int, cause: str) -> None:
+        """出局触发技能：猎人开枪 / 狼王开枪（被毒不能开）。"""
+        st = self._state(session)
+        if seat in st.alive:
+            return
+        if rules.can_hunter_shoot(st, seat, cause):
+            action = self._act(session, seat, "hunter", "你已出局，可以开枪带走一人。")
+            shot = self._pick_target(session, seat, action) if action.get("kind") == "shoot" else None
+            if shot is not None:
+                rules.apply_deaths(st, [{"seat": shot, "cause": "hunter"}])
+                session.narrate("猎人 {}号 开枪带走 {}号".format(seat, shot))
+                self._death_trigger(session, shot, "hunter")
+        elif rules.can_wolf_king_shoot(st, seat, cause):
+            action = self._act(session, seat, "wolf_king", "你是狼王，可以开枪带走一人。")
+            shot = self._pick_target(session, seat, action) if action.get("kind") == "shoot" else None
+            if shot is not None:
+                rules.apply_deaths(st, [{"seat": shot, "cause": "hunter"}])
+                session.narrate("狼王 {}号 开枪带走 {}号".format(seat, shot))
+                self._death_trigger(session, shot, "hunter")
+
     def _vote_round(self, session, candidates) -> dict:
         st = self._state(session)
         votes = {}
@@ -327,9 +392,13 @@ class WerewolfPlugin(BaseScenario):
             if target is not None and candidates is not None and target not in candidates:
                 target = None
             votes[seat] = target
-        result = rules.tally_votes(votes)
+        weights = {}
+        if st.sheriff is not None and st.sheriff in st.alive:
+            weights[st.sheriff] = float((self._scenario(session).sheriff or {}).get("vote_weight", 1.5))
+        result = rules.tally_votes(votes, weights)
         session.narrate("表决结果：" + "，".join(
-            "{}->{}".format(s, v if v else "弃") for s, v in sorted(votes.items())))
+            "{}->{}".format(s, v if v else "弃") for s, v in sorted(votes.items())) +
+            ("（警长 {}号 票权 {}）".format(st.sheriff, weights.get(st.sheriff, 1)) if weights else ""))
         return result
 
     @staticmethod
@@ -351,10 +420,17 @@ class WerewolfPlugin(BaseScenario):
         pool = [s for s in sorted(st.alive) if allow_self or s != seat]
         return pool[0] if pool else None
 
+    def _sync_alive(self, session) -> None:
+        st = self._state(session)
+        session.meta["alive"] = sorted(st.alive)
+        session.meta["sheriff"] = st.sheriff
+        session.meta["revealed"] = sorted(st.revealed)
+
     def _act(self, session, seat: int, context: str, instruction: str,
              channel: str = "public") -> dict:
         """问一个座位要动作；校验不过会带原因重说，最终拿不到就退化为 pass/abstain。"""
         st = self._state(session)
+        self._sync_alive(session)
         agent = session.agents.get(seat)
         if agent is None or seat not in st.alive:
             return {"kind": "pass"}

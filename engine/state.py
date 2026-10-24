@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .scenario import GOD_ROLES, GOOD_ROLES, Scenario
+from .scenario import GOD_ROLES, GOOD_ROLES, WOLF_ROLES, Scenario
 
 WOLF = "werewolf"
 
@@ -18,6 +18,7 @@ class GameState:
     witch_stock: dict = field(default_factory=lambda: {"antidote": 1, "poison": 1})
     guard_last: int | None = None      # 守卫上一晚守的人（不能连守同一人）
     revealed: set = field(default_factory=set)   # 已翻牌的白痴（免死但失去投票权）
+    sheriff: int | None = None                   # 警长座位（票权 1.5，白天最后发言）
     deaths_last_night: list[dict] = field(default_factory=list)
     transcript: list[dict] = field(default_factory=list)       # 公开发言
     wolf_transcript: list[dict] = field(default_factory=list)  # 狼队夜间密聊（仅狼可见）
@@ -58,10 +59,14 @@ class GameState:
         return counts
 
     def wolf_seats(self) -> list[int]:
-        return self.seats_of(WOLF)
+        return sorted(s for s, r in self.seat_roles.items() if r in WOLF_ROLES)
 
     def alive_wolves(self) -> list[int]:
-        return self.alive_of(WOLF)
+        return [s for s in self.wolf_seats() if s in self.alive]
+
+    def is_wolf(self, seat: int) -> bool:
+        """狼阵营：狼人与狼王都算。"""
+        return self.role_of(seat) in WOLF_ROLES
 
     def alive_goods(self) -> list[int]:
         return sorted(s for s in self.alive if self.role_of(s) in GOOD_ROLES)

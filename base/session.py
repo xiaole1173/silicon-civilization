@@ -63,6 +63,13 @@ class Session:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self.log_path.write_text("", encoding="utf-8")
 
+    def alive_ids(self) -> list:
+        """在场座位（默认全员）。带死亡机制的场景应在 meta["alive"] 里维护。"""
+        ids = self.meta.get("alive")
+        if isinstance(ids, (list, set, tuple)):
+            return sorted(int(x) for x in ids)
+        return sorted(self.agents)
+
     # ---------- 频道 ----------
     def add_channel(self, name: str, title: str = "", subscribers=None) -> Channel:
         ch = Channel(name, title or name, list(subscribers or []))

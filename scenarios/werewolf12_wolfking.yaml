@@ -1,0 +1,89 @@
+# 12 人狼王守卫局 —— 对齐官方正版「狼王局」配置
+# 官方狼王局：1 狼王 + 3 狼人；4 神（预言家 / 女巫 / 猎人 / 守卫）+ 4 民；屠边。
+name: 12 人狼王守卫局
+players: 12
+
+theme:
+  name: 黑森林村
+  premise: |
+    你们是黑森林边缘这 12 名村民。近一个月，村里每到夜里就有人被咬死，
+    天亮只剩一具冰冷的尸体和门外的爪印——白天大家还一起吃饭，但没人知道谁是披着人皮的狼。
+    村里有 4 头狼混在你们中间，其中一头是狼王——它倒下时还会带走一个人；
+    也有人会查验、会用药、干过猎户，还有人夜里会守在别人门口。
+    被咬死或被逐出村子，就是真的死了，不会重来。活下去，并找出狼。
+  roles:
+    werewolf: 狼人
+    seer: 预言家
+    witch: 女巫
+    hunter: 猎人
+    guard: 守卫
+    wolf_king: 狼王
+    villager: 村民
+  phases:
+    night: 夜里
+    day: 白天
+
+roles:
+  werewolf: 3
+  wolf_king: 1
+  seer: 1
+  witch: 1
+  hunter: 1
+  guard: 1
+  villager: 4
+
+witch:
+  antidote: 1
+  poison: 1
+  allow_self_save: false     # 官方：女巫不可自救
+  same_night_potion: false   # 每晚最多一瓶
+  poison_can_hit_hunter: true
+
+hunter:
+  can_shoot_when_poisoned: false   # 被毒杀不能开枪
+
+guard:
+  enabled: true
+  same_night_rescue: death
+
+
+wolf_discussion:
+  enabled: true
+  rounds: 1
+  max_chars: 120
+
+sheriff:
+  enabled: true
+  vote_weight: 1.5
+  speaks_last: true
+
+wolf_self_destruct:
+  enabled: true
+
+vote:
+  simultaneous: true
+  quorum: above_abstain
+  tie: revote_once
+  reveal_role_on_exit: true
+
+last_words:
+  enabled: true
+  after_vote: true
+  after_night: first_night   # 官方：夜里死亡只有首夜有遗言
+  max_chars: 150
+
+speech:
+  order: seat
+  mode: one_round
+  max_rounds: 3
+  max_chars: 220
+  passes_max: 1
+  include_transcript: -1
+
+win:
+  rule: side_elimination
+  max_days: 8
+
+unsupported:
+  - sheriff_badge_flow   # 警徽流（警长死亡移交）
+  - wolf_king            # 狼王（见 werewolf12_wolfking.yaml）

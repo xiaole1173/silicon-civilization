@@ -24,6 +24,8 @@ CONTEXT_TAG = {
     "day_vote": "【日间·表决】",
     "hunter": "【出局·反制】",
     "last_words": "【出局·遗言】",
+    "sheriff_vote": "【日间·警长竞选】",
+    "wolf_destruct": "【日间·自爆声明】",
 }
 
 CONTEXT_HINT = {
@@ -36,6 +38,8 @@ CONTEXT_HINT = {
     "day_vote": "白天，所有人要表态把谁逐出村子。",
     "hunter": "你已经死了，但还能做最后一次反制。",
     "last_words": "你即将消失，这是你最后一次开口——把你认为最重要的信息留给还活着的人。",
+    "sheriff_vote": "第一天要选出警长：警长票权更重、白天最后发言。",
+    "wolf_destruct": "白天你可以选择自爆：立刻出局，但直接进入黑夜，当天不投票。",
 }
 
 LEGAL = {
@@ -48,6 +52,8 @@ LEGAL = {
     "day_vote": ["vote", "abstain"],
     "hunter": ["shoot", "pass"],
     "last_words": ["speak", "pass"],
+    "sheriff_vote": ["vote", "abstain"],
+    "wolf_destruct": ["destruct", "pass"],
 }
 
 SCHEMA_TEXT = {
@@ -60,6 +66,8 @@ SCHEMA_TEXT = {
     "day_vote": '{"kind": "vote", "target": 座位号, "reason": "一句话理由"}',
     "hunter": '{"kind": "shoot", "target": 座位号} 或 {"kind": "pass"}',
     "last_words": '{"kind": "speak", "text": "你的遗言"}',
+    "sheriff_vote": '{"kind": "vote", "target": 座位号}',
+    "wolf_destruct": '{"kind": "destruct"} 或 {"kind": "pass"}',
 }
 
 SYSTEM = (
