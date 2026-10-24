@@ -103,24 +103,30 @@ class TestPluginSheriff(unittest.TestCase):
         self.plugin.setup(s)
         return s
 
-    def test_election_elects_top_vote(self):
+    def test_election_uses_campaign_flow(self):
+        """官方流程：上警 → 竞选发言 → 退水 → 警下投票（详细用例见 test_sheriff_campaign）。"""
         s = self._session("t-sheriff", "scenarios/werewolf12_standard.yaml")
 
-        def vote_first(conf, messages, **kw):
+        def campaign(conf, messages, **kw):
             sysmsg, user = messages[0]["content"], messages[1]["content"]
-            if "【日间·警长竞选】" in user:
-                seat = int(__import__("re").search(r"座位 (\d+)", sysmsg).group(1))
-                target = 1 if seat != 1 else 2
-                payload = {"kind": "vote", "target": target}
+            seat = int(__import__("re").search(r"座位 (\d+)", sysmsg).group(1))
+            if "【日间·上警】" in user:
+                payload = {"kind": "run"} if seat in (1, 4) else {"kind": "pass"}
+            elif "【日间·竞选发言】" in user:
+                payload = {"kind": "speak", "text": "我是{}号".format(seat)}
+            elif "【日间·退水】" in user:
+                payload = {"kind": "stay"}
+            elif "【日间·警长投票】" in user:
+                payload = {"kind": "vote", "target": 1}
             else:
                 payload = {"kind": "pass"}
             return {"choices": [{"finish_reason": "stop",
                                  "message": {"content": json.dumps(payload)}}]}
 
-        with mock.patch.object(providers, "call_chat", side_effect=vote_first):
+        with mock.patch.object(providers, "call_chat", side_effect=campaign):
             self.plugin._elect_sheriff(s)
         st = s.meta["game"]
-        self.assertEqual(st.sheriff, 1, "1 号应高票当选")
+        self.assertEqual(st.sheriff, 1, "1 号应在警下投票中胜出")
 
     def test_self_destruct_ends_day_and_kills_wolf(self):
         s = self._session("t-sheriff2", "scenarios/werewolf12_standard.yaml")
