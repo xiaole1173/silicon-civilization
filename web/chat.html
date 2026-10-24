@@ -250,6 +250,7 @@ function addReferee(m){
 }
 
 function createRound(rnd){
+  if (rnd && rnd.id && S.rounds[rnd.id]) return S.rounds[rnd.id];   // 幂等：同一回合只建一张卡
   var box = document.createElement("div");
   box.className = "round" + (rnd.channel === "wolves" ? " wolves" : "") +
     (rnd.kind === "vote" ? " votebox" : "");
