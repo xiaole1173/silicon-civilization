@@ -400,8 +400,12 @@ class WerewolfPlugin(BaseScenario):
         st = self._state(session)
         rnd = session.open_round(title, "第 1 天", kind="vote")
         votes = {}
+        names = "、".join("{} 号".format(c) for c in sorted(candidates))
         for seat in sorted(st.alive - set(candidates)):
-            action = self._act(session, seat, "sheriff_vote", "只能投给候选人。", round_id=rnd["id"])
+            action = self._act(
+                session, seat, "sheriff_vote",
+                "候选人只有 {}。你只能投给他们之一，**不能投给自己**（你也不在候选人里）。".format(names),
+                round_id=rnd["id"])
             target = self._as_target(action) if action.get("kind") == "vote" else None
             if target not in candidates:
                 target = None

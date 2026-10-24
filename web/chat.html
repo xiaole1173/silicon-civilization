@@ -459,7 +459,18 @@ function handleEvent(e){
     renderMembers(); return;
   }
   if (e.type === "round_start"){
-    createRound(e.round); updateMetrics(); return;
+    S.roundMeta[e.round.id] = e.round;
+    var existing = S.rounds[e.round.id];
+    if (existing){
+      // 卡片先于 round_start 建出来（空标题）：补上
+      var rt = existing.root.querySelector(".rt");
+      var rs = existing.root.querySelector(".rs");
+      if (rt && !rt.textContent) rt.textContent = e.round.title || "";
+      if (rs && !rs.textContent) rs.textContent = e.round.subtitle || "";
+    } else {
+      createRound(e.round);
+    }
+    updateMetrics(); return;
   }
   if (e.type === "round_end"){
     var rd = S.rounds[e.round];
