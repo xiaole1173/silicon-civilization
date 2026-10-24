@@ -26,6 +26,8 @@ CONTEXT_TAG = {
     "last_words": "【出局·遗言】",
     "sheriff_vote": "【日间·警长竞选】",
     "wolf_destruct": "【日间·自爆声明】",
+    "wolf_king": "【出局·狼王反制】",
+    "badge": "【出局·警徽移交】",
 }
 
 CONTEXT_HINT = {
@@ -40,6 +42,8 @@ CONTEXT_HINT = {
     "last_words": "你即将消失，这是你最后一次开口——把你认为最重要的信息留给还活着的人。",
     "sheriff_vote": "第一天要选出警长：警长票权更重、白天最后发言。",
     "wolf_destruct": "白天你可以选择自爆：立刻出局，但直接进入黑夜，当天不投票。",
+    "wolf_king": "你是狼王/白狼王：出局时可以开枪带走一人（被毒杀不能）。",
+    "badge": "你是警长且已出局：可以把警徽交给一个活着的人，也可以让它作废。",
 }
 
 LEGAL = {
@@ -54,6 +58,8 @@ LEGAL = {
     "last_words": ["speak", "pass"],
     "sheriff_vote": ["vote", "abstain"],
     "wolf_destruct": ["destruct", "pass"],
+    "wolf_king": ["shoot", "pass"],
+    "badge": ["pass_badge", "destroy"],
 }
 
 SCHEMA_TEXT = {
@@ -68,6 +74,8 @@ SCHEMA_TEXT = {
     "last_words": '{"kind": "speak", "text": "你的遗言"}',
     "sheriff_vote": '{"kind": "vote", "target": 座位号}',
     "wolf_destruct": '{"kind": "destruct"} 或 {"kind": "pass"}',
+    "wolf_king": '{"kind": "shoot", "target": 座位号} 或 {"kind": "pass"}',
+    "badge": '{"kind": "pass_badge", "target": 座位号} 或 {"kind": "destroy"}',
 }
 
 SYSTEM = (

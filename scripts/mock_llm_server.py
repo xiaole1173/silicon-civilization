@@ -65,6 +65,8 @@ def choose(user_text: str):
         return ({"kind": "pass"}, "现在还不是自爆的时候。")
     if "【出局·狼王反制】" in user_text:
         return ({"kind": "pass"}, "先不带走人。")
+    if "【出局·警徽移交】" in user_text:
+        return ({"kind": "pass_badge", "target": alive[0] if alive else 1}, "把警徽交给最可信的人。")
     if "【出局·反制】" in user_text:
         return ({"kind": "pass"}, "没有把握，先不开枪。")
     # 非狼人杀场景（例如圆桌讨论）：直接给一段自然语言

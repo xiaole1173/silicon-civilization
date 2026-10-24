@@ -10,9 +10,10 @@ try:
 except ImportError:  # pragma: no cover
     yaml = None
 
-SUPPORTED_ROLES = ("werewolf", "wolf_king", "seer", "witch", "hunter",
-                   "guard", "idiot", "villager")
-WOLF_ROLES = ("werewolf", "wolf_king")
+SUPPORTED_ROLES = ("werewolf", "wolf_king", "white_wolf_king", "seer", "witch",
+                   "hunter", "guard", "idiot", "villager")
+WOLF_ROLES = ("werewolf", "wolf_king", "white_wolf_king")
+KING_ROLES = ("wolf_king", "white_wolf_king")
 GOOD_ROLES = ("seer", "witch", "hunter", "guard", "idiot", "villager")
 GOD_ROLES = ("seer", "witch", "hunter", "guard", "idiot")
 
@@ -151,6 +152,7 @@ class Scenario:
         "guard": "守卫",
         "idiot": "白痴",
         "wolf_king": "狼王",
+        "white_wolf_king": "白狼王",
         "villager": "村民",
     }
 

@@ -351,8 +351,18 @@ class WerewolfPlugin(BaseScenario):
         for seat in sorted(st.alive_wolves()):
             action = self._act(session, seat, "wolf_destruct", "要不要现在自爆？")
             if action.get("kind") == "destruct":
+                role = st.role_of(seat)
                 rules.apply_deaths(st, [{"seat": seat, "cause": "destruct"}])
-                session.narrate("{}号狼人自爆！当天不再陈述与投票，直接进入黑夜".format(seat))
+                if role == "white_wolf_king":
+                    session.narrate("{}号白狼王自爆！当天不再陈述与投票，直接进入黑夜".format(seat))
+                    take = self._act(session, seat, "wolf_king", "你自爆了，可以带走一个人。")
+                    victim = self._pick_target(session, seat, take) if take.get("kind") == "shoot" else None
+                    if victim is not None:
+                        rules.apply_deaths(st, [{"seat": victim, "cause": "destruct"}])
+                        session.narrate("白狼王带走 {}号".format(victim))
+                        self._death_trigger(session, victim, "destruct")
+                else:
+                    session.narrate("{}号狼人自爆！当天不再陈述与投票，直接进入黑夜".format(seat))
                 return True
         return False
 
@@ -369,12 +379,30 @@ class WerewolfPlugin(BaseScenario):
                 session.narrate("猎人 {}号 开枪带走 {}号".format(seat, shot))
                 self._death_trigger(session, shot, "hunter")
         elif rules.can_wolf_king_shoot(st, seat, cause):
-            action = self._act(session, seat, "wolf_king", "你是狼王，可以开枪带走一人。")
+            king_label = self._role_label(session, st.role_of(seat))
+            action = self._act(session, seat, "wolf_king", "你是{}，可以开枪带走一人。".format(king_label))
             shot = self._pick_target(session, seat, action) if action.get("kind") == "shoot" else None
             if shot is not None:
                 rules.apply_deaths(st, [{"seat": shot, "cause": "hunter"}])
-                session.narrate("狼王 {}号 开枪带走 {}号".format(seat, shot))
+                session.narrate("{} {}号 开枪带走 {}号".format(king_label, seat, shot))
                 self._death_trigger(session, shot, "hunter")
+
+        # 警徽流：警长出局则移交（放在技能之后，避免警徽跟着死）
+        if st.sheriff == seat:
+            self._handle_badge(session, seat)
+
+    def _handle_badge(self, session, seat: int) -> None:
+        """警徽流：警长出局时移交警徽，没移交就作废。"""
+        st = self._state(session)
+        st.sheriff = None
+        action = self._act(session, seat, "badge",
+                           "你是警长，已经出局。可以把警徽交给一个还活着的人。")
+        target = self._as_target(action) if action.get("kind") == "pass_badge" else None
+        if target is not None and target in st.alive and target != seat:
+            st.sheriff = target
+            session.narrate("警徽移交：{}号 → {}号".format(seat, target))
+        else:
+            session.narrate("警徽流失（{}号没有移交）".format(seat))
 
     def _vote_round(self, session, candidates) -> dict:
         st = self._state(session)
@@ -432,7 +460,9 @@ class WerewolfPlugin(BaseScenario):
         st = self._state(session)
         self._sync_alive(session)
         agent = session.agents.get(seat)
-        if agent is None or seat not in st.alive:
+        # 出局后仍可行动：猎人开枪、遗言、警徽移交、狼王反制
+        death_ok = context in ("hunter", "last_words", "badge", "wolf_king")
+        if agent is None or (seat not in st.alive and not death_ok):
             return {"kind": "pass"}
         tag = ep.CONTEXT_TAG.get(context, "")
         schema = ep.SCHEMA_TEXT.get(context, "")
@@ -470,6 +500,7 @@ class WerewolfPlugin(BaseScenario):
             "poison": "（用毒药毒 {} 号）",
             "vote": "（投票给 {} 号）",
             "shoot": "（开枪带走 {} 号）",
+            "pass_badge": "（把警徽交给 {} 号）",
         }
         if kind in words and target not in (None, ""):
             return words[kind].format(target)
@@ -477,4 +508,8 @@ class WerewolfPlugin(BaseScenario):
             return "（弃权）"
         if kind == "pass":
             return "（没有动作）"
+        if kind == "destroy":
+            return "（警徽作废）"
+        if kind == "destruct":
+            return "（自爆）"
         return "（{}）".format(kind or "无动作")

@@ -84,5 +84,5 @@ win:
   max_days: 8
 
 unsupported:
-  - sheriff_badge_flow   # 警徽流（警长死亡移交）
   - wolf_king            # 狼王（见 werewolf12_wolfking.yaml）
+  - white_wolf_king      # 白狼王（见 werewolf12_whitewolf.yaml）

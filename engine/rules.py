@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from .scenario import GOD_ROLES, WOLF_ROLES
+from .scenario import GOD_ROLES, KING_ROLES, WOLF_ROLES
 from .state import WOLF, GameState
 
 
@@ -15,10 +15,9 @@ CONTEXT_ROLE = {
     "night_seer": "seer",
     "night_witch": "witch",
     "night_guard": "guard",
-    "wolf_king": "wolf_king",
 }
 
-# 狼阵营专属语境：狼王与狼人共用
+# 狼阵营专属语境：狼王/白狼王与狼人共用
 WOLF_CONTEXTS = {"wolf_speak", "night_wolf", "wolf_destruct"}
 
 
@@ -174,7 +173,18 @@ def validate_action(state: GameState, seat: int, action: dict, *, context: str) 
             return False, "发言异常过长（超过 {} 字，疑似输出失控）".format(limit * 4)
         return True, ""
 
+    if context == "badge":
+        if state.sheriff != seat:
+            return False, "只有警长才能移交警徽"
+        if kind not in ("pass_badge", "destroy"):
+            return False, "警徽只能 pass_badge（移交）或 destroy（放弃）"
+        if kind == "pass_badge":
+            return _check_target(state, action, seat, allow_self=False, context="警徽移交")
+        return True, ""
+
     if context == "wolf_king":
+        if state.role_of(seat) not in KING_ROLES:
+            return False, "只有狼王/白狼王才能开枪"
         if kind not in ("shoot", "pass"):
             return False, "狼王只能 shoot 或 pass"
         if kind == "shoot":
@@ -298,8 +308,11 @@ def resolve_vote_death(state: GameState, seat: int) -> dict:
 
 
 def can_wolf_king_shoot(state: GameState, seat: int, cause: str) -> bool:
-    """狼王：被投出或被带走时可开枪；被毒杀不能。"""
-    if state.role_of(seat) != "wolf_king":
+    """狼王/白狼王：被投出、被带走、自爆时可开枪；被毒杀不能。
+
+    白狼王的自爆带人由插件在自爆流程里额外触发（cause="destruct"）。
+    """
+    if state.role_of(seat) not in KING_ROLES:
         return False
     return cause != "poison"
 
