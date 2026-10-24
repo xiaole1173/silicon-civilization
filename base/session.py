@@ -55,6 +55,7 @@ class Session:
             OBSERVER: Channel(OBSERVER, "观察者"),
         }
         self.messages: list[Message] = []
+        self.rounds: list[dict] = []
         self.broker = Broker()
         self.state = "created"
         self.winner = None
@@ -95,8 +96,30 @@ class Session:
         self.broker.publish(event)
         self._persist(event)
 
+    def open_round(self, title: str, subtitle: str = "", channel: str = PUBLIC,
+                   kind: str = "group") -> dict:
+        """开一个"回合卡"：同一批行动（如狼队密谋、全体表决）收纳在一起。"""
+        rnd = {"id": "r{}".format(len(self.rounds) + 1), "title": title,
+               "subtitle": subtitle, "channel": channel, "kind": kind,
+               "items": [], "summary": ""}
+        self.rounds.append(rnd)
+        self._publish({"type": "round_start", "round": {k: v for k, v in rnd.items() if k != "items"}})
+        return rnd
+
+    def close_round(self, rnd: dict, summary: str = "") -> None:
+        if rnd is None:
+            return
+        rnd["summary"] = summary
+        self._publish({"type": "round_end", "round": rnd["id"], "summary": summary})
+
+    def referee(self, text: str, public: bool = True) -> Message:
+        """裁判发言：由确定性程序发出，负责串起整局的节奏。"""
+        channel = PUBLIC if public else OBSERVER
+        return self.add_message(channel, None, kind="referee", text=text)
+
     def add_message(self, channel: str, sender: int | None, kind: str = "speak",
-                    text: str = "", thinking: str = "", meta: dict | None = None) -> Message:
+                    text: str = "", thinking: str = "", meta: dict | None = None,
+                    round_id: str = "") -> Message:
         with self._lock:
             self._seq += 1
             seq = self._seq
@@ -106,25 +129,32 @@ class Session:
             sender=sender, sender_name=(agent.name if agent else "旁白"),
             kind=kind, text=text, thinking=thinking, meta=meta or {},
         )
+        if round_id:
+            msg.meta["round"] = round_id
         self.messages.append(msg)
-        self._publish({"type": "message_start", "message": msg.to_dict()})
+        payload = msg.to_dict()
+        if round_id:
+            payload["round"] = round_id
+        self._publish({"type": "message_start", "message": payload})
         return msg
 
     # ---------- 调用模型（流式 + 事实卡 + 校验重说） ----------
     def ask(self, agent: Agent, instruction: str, channel: str = PUBLIC,
             kind: str = "speak", budget: int = 2048, temperature: float | None = None,
             timeout: float = 240.0, label: str = "", validator=None,
-            retries: int = 2, facts: dict | None = None) -> Message | None:
+            retries: int = 2, facts: dict | None = None, round_id: str = "") -> Message | None:
         """让某个 agent 说话：装配上下文 → 流式生成 → 校验 → 不合格就带着原因重说。"""
         from base.context import build as build_context
         from base.facts import render_facts
 
         self._publish({"type": "turn", "state": "start", "agent": agent.id,
                        "name": agent.name, "label": label})
-        msg = self.add_message(channel, agent.id, kind=kind, text="")
+        msg = self.add_message(channel, agent.id, kind=kind, text="", round_id=round_id)
         started = time.time()
         meta = {"model": agent.model_conf.get("model", ""), "label": label,
                 "attempts": 0, "rejections": []}
+        if round_id:
+            meta["round"] = round_id
         text, thinking = "", ""
         prompt = instruction
 
@@ -228,10 +258,13 @@ class Session:
             "winner": self.winner, "scenario": getattr(self.scenario, "id", ""),
             "channels": [{"name": c.name, "title": c.title} for c in self.channels.values()],
             "agents": [{"id": a.id, "name": a.name,
-                        "model": a.model_conf.get("model", "")} for a in self.agents.values()],
+                        "model": a.model_conf.get("model", ""),
+                        "role": (self.meta.get("agent_roles") or {}).get(a.id, "")}
+                       for a in self.agents.values()],
             "alive": self.alive_ids(),
             "sheriff": self.meta.get("sheriff"),
             "revealed": self.meta.get("revealed") or [],
             "messages": [m.to_dict() for m in self.messages],
+            "rounds": self.rounds,
             "config": self.config,
         }

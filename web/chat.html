@@ -20,26 +20,29 @@
   button:hover{background:#f3f5f9}
   button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
   button.primary:hover{background:#3263cc}
-  input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:10px;
+  input,select{font:inherit;border:1px solid var(--line);border-radius:10px;
     padding:7px 10px;background:#fff;color:var(--ink);width:100%}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:#a9c3f5;
-    box-shadow:0 0 0 3px var(--accent-weak)}
+  input:focus,select:focus{outline:none;border-color:#a9c3f5;box-shadow:0 0 0 3px var(--accent-weak)}
   label{display:block;font-size:12px;color:var(--muted);margin:0 0 4px}
 
   header{height:56px;background:var(--panel);border-bottom:1px solid var(--line);
-    display:flex;align-items:center;gap:12px;padding:0 18px;position:sticky;top:0;z-index:10}
-  header h1{font-size:15px;margin:0;font-weight:650;letter-spacing:.2px}
+    display:flex;align-items:center;gap:12px;padding:0 18px;position:relative;z-index:10}
+  header h1{font-size:15px;margin:0;font-weight:650}
   .pill{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);
     border-radius:999px;padding:2px 10px}
   .pill b{color:var(--ink);font-weight:600}
   .spacer{flex:1}
 
-  main{display:grid;grid-template-columns:250px minmax(0,1fr) 260px;gap:0;
+  #banner{display:none;padding:7px 18px;background:#fff4e5;color:#8a5b12;font-size:12.5px;
+    border-bottom:1px solid #f3e2c7}
+  #banner.show{display:block}
+
+  main{display:grid;grid-template-columns:240px minmax(0,1fr) 250px;
     height:calc(100vh - 56px);overflow:hidden}
 
   /* 左栏 */
   #left{border-right:1px solid var(--line);background:var(--panel);padding:14px;overflow:auto}
-  #left h2{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 8px;letter-spacing:.4px}
+  #left h2,#right h2{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 8px}
   .sess{display:block;width:100%;text-align:left;border:1px solid transparent;border-radius:10px;
     padding:8px 10px;margin-bottom:4px;background:transparent;cursor:pointer}
   .sess:hover{background:var(--bg)}
@@ -48,107 +51,118 @@
   .sess .s{font-size:11.5px;color:var(--muted)}
 
   /* 中栏 */
-  #chat{display:flex;flex-direction:column;min-width:0;background:var(--bg);overflow:hidden}
-  #stream{flex:1;overflow:auto;padding:22px 26px 40px}
-  .dayline{display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--muted);font-size:12px}
-  .dayline::before,.dayline::after{content:"";height:1px;background:var(--line);flex:1}
-  .msg{display:flex;gap:10px;margin:0 0 16px;max-width:760px}
-  .ava{flex:none;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;
-    justify-content:center;font-size:12px;font-weight:700;color:#fff;
-    background:#8b95a6;letter-spacing:-.5px}
-  .body{min-width:0;flex:1}
-  .head{display:flex;align-items:baseline;gap:8px;margin-bottom:3px}
-  .who{font-weight:650;font-size:13px}
-  .role{font-size:11px;padding:0 6px;border-radius:6px;background:#eef3fe;color:#3b6fe0}
-  .mdl{font-size:11px;color:#9aa2b1}
-  .meta{font-size:11.5px;color:var(--muted)}
-  .bubble{background:var(--panel);border:1px solid var(--line);border-radius:12px;
-    padding:9px 12px;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 2px rgba(18,24,38,.03)}
-  .msg.thinking-now .bubble{border-color:#cfdcf8}
-  .msg.act-msg .bubble{background:#fafbfd;color:#5b6472;font-size:12.5px;
-    border-style:dashed;box-shadow:none;display:inline-flex;align-items:center;gap:6px}
+  #chat{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  #stream{flex:1;overflow:auto;padding:18px 22px 30px}
+
+  /* 裁判 */
+  .ref{display:flex;gap:10px;align-items:flex-start;margin:14px 0;padding:9px 12px;
+    background:#eef1f6;border-radius:10px;color:#37414f;font-size:13px}
+  .ref .who{flex:none;font-weight:700;font-size:12px;color:#5b6472;
+    border-right:1px solid #d9dee6;padding-right:10px}
+  .ref.private{background:#f7f4fb;color:#5f4b7a}
+  .ref.private .who{color:#7a5fa0;border-color:#e4d9f0}
+
+  /* 回合卡 */
+  .round{border:1px solid var(--line);border-radius:12px;background:var(--panel);
+    margin:12px 0;overflow:hidden}
+  .round-head{display:flex;align-items:center;gap:9px;padding:8px 13px;
+    background:#fbfcfe;border-bottom:1px solid var(--line)}
+  .round-head .rt{font-size:13px;font-weight:650}
+  .round-head .rs{font-size:11.5px;color:var(--muted)}
+  .round-head .rx{margin-left:auto;font-size:11.5px;color:#3b6fe0;font-variant-numeric:tabular-nums}
+  .round-body{padding:10px 13px}
+  .round.wolves{border-color:#e6dcf7}
+  .round.wolves .round-head{background:#faf7ff}
+  .round.wolves .rt{color:#6b3fa0}
+
+  /* 回合内条目 */
+  .item{display:flex;gap:9px;align-items:flex-start;padding:5px 0}
+  .item + .item{border-top:1px dashed #f1f3f7}
+  .seat{flex:none;width:24px;height:24px;border-radius:8px;color:#fff;font-size:11.5px;
+    font-weight:700;display:flex;align-items:center;justify-content:center}
+  .ibody{min-width:0;flex:1}
+  .ihead{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
+  .who{font-weight:600;font-size:12.5px}
+  .role{font-size:10.5px;padding:0 6px;border-radius:6px;background:#eef3fe;color:#3b6fe0}
+  .mdl{font-size:10.5px;color:#a3aab6}
+  .lat{font-size:10.5px;color:#b6bcc7;margin-left:auto}
+  .itext{margin-top:2px;white-space:pre-wrap;word-break:break-word;font-size:13px;color:#2a2f38}
+  .votes{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+  .round.votebox .round-body{padding:8px 13px}
+  .vchip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:2px 8px;
+    border-radius:999px;background:#f1f4f9;color:#4a5464}
+  .vchip b{font-variant-numeric:tabular-nums}
+  .abstain{color:#a2a9b4}
+  .think{margin-top:5px;border-left:2px solid #ece4cf;background:var(--think-bg);
+    border-radius:0 8px 8px 0;padding:5px 9px;font-size:12px;color:var(--think)}
+  .think summary{cursor:pointer;list-style:none;font-size:11.5px;color:#9a8b62}
+  .think summary::-webkit-details-marker{display:none}
+  .think summary::before{content:"思考"}
+  .think .t{max-height:220px;overflow:auto;white-space:pre-wrap;margin-top:4px}
+
   .chip{display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:12px;
-    padding:1px 8px;border-radius:999px;background:#eef1f6;color:#49536a}
+    padding:1px 9px;border-radius:999px;background:#eef1f6;color:#49536a}
   .chip.kill{background:#fdecea;color:#b4271c}
   .chip.check{background:#eaf3ff;color:#2257a8}
   .chip.poison{background:#f3ecff;color:#6b3fa0}
   .chip.vote{background:#eaf7ef;color:#1e7e45}
   .chip.badge{background:#fff5e5;color:#9a6212}
-  .dead .ava{filter:grayscale(1);opacity:.45}
-  .member.out .nm{text-decoration:line-through;color:#a7aeb9}
-  .sys{max-width:760px;margin:10px 0;font-size:12.5px;color:var(--muted);
-    display:flex;align-items:center;gap:8px}
-  .sys::before{content:"";width:3px;height:14px;border-radius:2px;background:#d8dee9}
-  .think{margin-top:6px;border-left:2px solid #ece4cf;background:var(--think-bg);
-    border-radius:0 8px 8px 0;padding:6px 9px;font-size:12.5px;color:var(--think)}
-  .think summary{cursor:pointer;list-style:none;font-size:12px;color:#9a8b62}
-  .think summary::-webkit-details-marker{display:none}
-  .think summary::before{content:"思考 · "}
-  .think[open] summary::before{content:"收起思考 · "}
-  .think .t{max-height:240px;overflow:auto;white-space:pre-wrap;margin-top:5px}
-  .caret{display:inline-block;width:6px;height:13px;background:#c2a96a;border-radius:1px;
-    margin-left:2px;animation:blink 1s steps(1) infinite;vertical-align:-2px}
-  @keyframes blink{50%{opacity:0}}
-  .errline{margin-top:6px;font-size:12px;color:var(--err)}
 
-  #composer{border-top:1px solid var(--line);background:var(--panel);padding:10px 18px;
-    display:flex;gap:10px;align-items:center;color:var(--muted);font-size:12.5px}
+  .errline{font-size:11.5px;color:#b45309;margin-top:3px}
+
+  #composer{border-top:1px solid var(--line);background:var(--panel);padding:9px 18px;
+    color:var(--muted);font-size:12.5px}
 
   /* 右栏 */
   #right{border-left:1px solid var(--line);background:var(--panel);padding:14px;overflow:auto}
-  #right h2{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 8px;letter-spacing:.4px}
-  .member{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dashed #f0f2f6}
-  .member:last-child{border-bottom:0}
-  .member .nm{font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .member .md{font-size:11px;color:var(--muted);max-width:96px;overflow:hidden;
-    text-overflow:ellipsis;white-space:nowrap}
-  .dot{width:7px;height:7px;border-radius:50%;background:#d5dae2;flex:none}
-  .dot.on{background:var(--ok);animation:pulse 1.2s ease-in-out infinite}
-  @keyframes pulse{50%{opacity:.35}}
-  .kv{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:var(--muted)}
+  .member{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px dashed #f0f2f6}
+  .member.out{opacity:.5}
+  .member.out .nm{text-decoration:line-through}
+  .member .nm{font-size:12.5px}
+  .member .md{font-size:10.5px;color:var(--muted);margin-left:auto;max-width:88px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tag{font-size:10px;padding:0 5px;border-radius:5px;background:#fff5e5;color:#9a6212}
+  .kv{display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0;color:var(--muted)}
   .kv b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .hint{font-size:12px;color:var(--muted)}
 
-  /* 新建会话弹层 */
+  /* 弹层 */
   #modal{position:fixed;inset:0;background:rgba(16,20,28,.32);display:none;
     align-items:center;justify-content:center;z-index:50;padding:24px}
   #modal.show{display:flex}
-  .sheet{background:var(--panel);border-radius:16px;width:min(720px,100%);max-height:86vh;
+  .sheet{background:var(--panel);border-radius:16px;width:min(760px,100%);max-height:86vh;
     overflow:auto;padding:20px 22px;box-shadow:0 20px 50px rgba(16,24,40,.18)}
   .sheet h3{margin:0 0 14px;font-size:16px}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .row{display:flex;gap:10px;align-items:flex-end;margin-bottom:12px}
-  .seatrow{display:flex;gap:10px;align-items:center;margin-bottom:8px}
-  .seatrow .idx{width:42px;font-size:12px;color:var(--muted)}
-  .seatrow .mdl{flex:1}
-  .hint{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .seatrow{display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:center;margin-bottom:7px}
   .footer{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
 </style>
 </head>
 <body>
 <header>
   <h1>多智能体会话基座</h1>
-  <span class="pill">场景插件 <b id="pluginName">—</b></span>
+  <span class="pill">场景 <b id="pluginName">—</b></span>
   <span class="pill">消息 <b id="msgCount">0</b></span>
   <span class="pill" id="statePill">未开始</span>
   <span class="spacer"></span>
   <button class="primary" id="btnNew">新建会话</button>
 </header>
+<div id="banner"></div>
 
 <main>
   <aside id="left">
     <h2>会话</h2>
     <div id="sessList"><div class="hint">还没有会话</div></div>
   </aside>
-
   <section id="chat">
     <div id="stream"><div class="hint" style="padding:20px 0">新建一个会话，或从左侧选择。</div></div>
     <div id="composer"><span id="typingHint">空闲</span></div>
   </section>
-
   <aside id="right">
     <h2>参与者</h2>
     <div id="members"><div class="hint">—</div></div>
-    <h2 style="margin-top:18px">指标</h2>
+    <h2 style="margin-top:16px">指标</h2>
     <div id="metrics"><div class="kv"><span>消息</span><b>0</b></div></div>
   </aside>
 </main>
@@ -157,17 +171,11 @@
   <div class="sheet">
     <h3>新建会话</h3>
     <div class="row">
-      <div style="flex:1">
-        <label>场景插件</label>
-        <select id="pluginSel"></select>
-      </div>
-      <div style="width:180px">
-        <label>标题（可选）</label>
-        <input id="titleInput" placeholder="例如 圆桌讨论 1">
-      </div>
+      <div style="flex:1"><label>场景插件</label><select id="pluginSel"></select></div>
+      <div style="width:190px"><label>标题（可选）</label><input id="titleInput"></div>
     </div>
     <div id="configBox" class="grid"></div>
-    <label style="margin-top:12px">参与者（座位 = 模型）</label>
+    <label style="margin-top:12px">参与者（每个座位一个模型）</label>
     <div id="seats"></div>
     <div class="row" style="margin-top:8px">
       <button id="btnAddSeat">再加一个座位</button>
@@ -182,392 +190,24 @@
 
 <script>
 var S = { plugins: [], models: [], sessions: [], cur: null, es: null,
-          msgs: {}, agents: {}, startedAt: 0, stick: true,
+          msgs: {}, rounds: {}, agents: {}, stick: true, retry: 0,
           alive: null, sheriff: null, revealed: [] };
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s)
   .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-function api(path, opt){
-  return fetch(path, opt).then(function(r){ return r.json(); });
-}
+function api(path, opt){ return fetch(path, opt).then(function(r){ return r.json(); }); }
+
 var PALETTE = ["#5b7cfa","#12a594","#c26a3d","#8e6bd6","#3a8fb7","#b4574f",
                "#6b8f3d","#a2568f","#4d7a9c","#8a7b3f","#5f6f8a","#a05a6b"];
 function colorFor(seat){ return PALETTE[(Number(seat) - 1 + PALETTE.length) % PALETTE.length]; }
 
-// ---------- 数据加载 ----------
-function loadPlugins(){
-  return api("/api/plugins").then(function(d){ S.plugins = d.plugins || []; renderPluginOptions(); });
+/* ---------- 通用 ---------- */
+function banner(text){
+  var el = $("banner");
+  el.className = text ? "show" : "";
+  el.textContent = text || "";
 }
-function loadModels(){
-  return api("/api/models").then(function(d){ S.models = d.models || []; });
-}
-function loadSessions(){
-  return api("/api/sessions").then(function(d){
-    S.sessions = d.sessions || [];
-    $("sessList").innerHTML = S.sessions.length
-      ? S.sessions.map(function(s){
-          return '<button class="sess' + (S.cur === s.id ? " on" : "") + '" data-id="' + esc(s.id) + '">' +
-            '<div class="t">' + esc(s.title) + '</div>' +
-            '<div class="s">' + esc(s.scenario) + ' · ' + s.messages + ' 条 · ' + esc(stateText(s.state)) + '</div></button>';
-        }).join("")
-      : '<div class="hint">还没有会话</div>';
-  });
-}
-
-// ---------- 新建会话 ----------
-function renderPluginOptions(){
-  $("pluginSel").innerHTML = S.plugins.map(function(p){
-    return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>';
-  }).join("");
-  renderConfig();
-  renderSeats(3);
-}
-function currentPlugin(){
-  var id = $("pluginSel").value;
-  return S.plugins.filter(function(p){ return p.id === id; })[0];
-}
-function renderConfig(){
-  var p = currentPlugin();
-  var box = $("configBox");
-  if (!p || !p.default_config){ box.innerHTML = ""; return; }
-  box.innerHTML = Object.keys(p.default_config).map(function(k){
-    var v = p.default_config[k];
-    var type = typeof v === "number" ? "number" : "text";
-    return '<div><label>' + esc(k) + '</label><input data-cfg="' + esc(k) + '" type="' + type +
-      '" value="' + esc(v) + '"></div>';
-  }).join("");
-}
-function modelOptions(selected){
-  if (!S.models.length) return '<option value="">（先在模型管理里添加模型）</option>';
-  return S.models.map(function(m){
-    return '<option value="' + esc(m.id) + '"' + (m.id === selected ? " selected" : "") + '>' +
-      esc(m.name) + ' · ' + esc(m.protocol) + '</option>';
-  }).join("");
-}
-function renderSeats(n){
-  var box = $("seats");
-  var keep = box.querySelectorAll("select").length;
-  if (keep === n) return;
-  box.innerHTML = "";
-  for (var i = 1; i <= n; i++){
-    var div = document.createElement("div");
-    div.className = "seatrow";
-    div.innerHTML = '<span class="idx">' + i + ' 号</span>' +
-      '<select class="mdl">' + modelOptions() + '</select>';
-    box.appendChild(div);
-  }
-}
-function openModal(){
-  $("modal").classList.add("show");
-  var p = currentPlugin();
-  if (p) $("titleInput").value = p.name;
-}
-function closeModal(){ $("modal").classList.remove("show"); }
-
-function startSession(){
-  var p = currentPlugin();
-  if (!p){ alert("还没有插件"); return; }
-  var config = {};
-  Array.prototype.forEach.call(document.querySelectorAll("[data-cfg]"), function(el){
-    var v = el.value;
-    config[el.getAttribute("data-cfg")] = (el.type === "number") ? Number(v) : v;
-  });
-  var seats = [];
-  Array.prototype.forEach.call(document.querySelectorAll("#seats .mdl"), function(sel, i){
-    seats.push({ model_id: sel.value, name: (i + 1) + "号" });
-  });
-  if (seats.some(function(s){ return !s.model_id; })){
-    alert("每个座位都要选模型"); return;
-  }
-  $("btnStart").disabled = true;
-  api("/api/sessions", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ plugin: p.id, config: config, seats: seats,
-                           title: $("titleInput").value || p.name })
-  }).then(function(d){
-    $("btnStart").disabled = false;
-    if (!d.ok){ alert(d.error || "创建失败"); return; }
-    closeModal();
-    attach(d.session.id);
-    loadSessions();
-  }).catch(function(){ $("btnStart").disabled = false; alert("请求失败"); });
-}
-
-// ---------- 聊天流 ----------
-function attach(sid){
-  if (S.es){ S.es.close(); S.es = null; }
-  S.cur = sid; S.msgs = {}; S.agents = {}; S.startedAt = Date.now();
-  $("stream").innerHTML = "";
-  var es = new EventSource("/api/sessions/" + encodeURIComponent(sid) + "/stream");
-  S.es = es;
-  es.onmessage = function(ev){
-    var data;
-    try { data = JSON.parse(ev.data); } catch (e) { return; }
-    handleEvent(data);
-  };
-  es.onerror = function(){ /* 浏览器会自动重连 */ };
-  loadSessions();
-}
-
-// 静态模式：不连 SSE，直接拉快照渲染（用于截图/回看）
-function attachStatic(sid){
-  S.cur = sid; S.msgs = {}; S.agents = {};
-  $("stream").innerHTML = "";
-  return api("/api/sessions/" + encodeURIComponent(sid)).then(function(d){
-    if (!d.ok){ $("stream").innerHTML = '<div class="hint">会话不存在</div>'; return; }
-    var s = d.session;
-    $("pluginName").textContent = s.scenario || "—";
-    (s.agents || []).forEach(function(a){ S.agents[a.id] = a; });
-    S.alive = s.alive || null; S.sheriff = s.sheriff; S.revealed = s.revealed || [];
-    renderMembers(); setState(s.state, s.winner);
-    (s.messages || []).forEach(function(m){
-      addBubble(m);
-      var node = S.msgs[m.id];
-      if (!node) return;
-      var actHtml = m.meta && m.meta.action ? actionHtml(m.meta.action) : null;
-      if (actHtml){ node.root.classList.add("act-msg"); node.text.innerHTML = actHtml; }
-      else node.text.textContent = m.text || "";
-      node.think.textContent = m.thinking || "";
-      node.thinkBox.style.display = (m.thinking || "").trim() ? "block" : "none";
-      node.root.classList.remove("thinking-now");
-      node.status.textContent = "";
-      if (m.meta && m.meta.usage){
-        node.usage = m.meta.usage;
-        node.meta.textContent = (m.meta.latency_ms || 0) + "ms · " +
-          (m.meta.usage.prompt_tokens || 0) + "→" + (m.meta.usage.completion_tokens || 0) + " tok";
-      }
-    });
-    updateMetrics();
-    S.stick = true;
-    scrollBottom(true);
-  });
-}
-
-function handleEvent(e){
-  if (e.type === "state"){
-    S.alive = e.alive || S.alive;
-    S.sheriff = e.sheriff;
-    S.revealed = e.revealed || [];
-    renderMembers();
-    return;
-  }
-  if (e.type === "snapshot"){
-    $("pluginName").textContent = e.scenario || "—";
-    (e.agents || []).forEach(function(a){ S.agents[a.id] = a; });
-    S.alive = e.alive || null; S.sheriff = e.sheriff; S.revealed = e.revealed || [];
-    renderMembers();
-    setState(e.state);
-    return;
-  }
-  if (e.type === "message_start"){
-    var m = e.message;
-    if (S.msgs[m.id]) return;
-    addBubble(m);
-    return;
-  }
-  if (e.type === "delta"){
-    var node = S.msgs[e.id];
-    if (!node) return;
-    if (e.field === "thinking"){
-      node.think.textContent += e.text;
-      node.thinkBox.style.display = "block";
-      node.thinkBox.open = true;
-      node.status.textContent = "正在思考";
-    } else {
-      node.text.textContent += e.text;
-      node.status.textContent = "正在说话";
-    }
-    scrollBottom();
-    return;
-  }
-  if (e.type === "message_end"){
-    var n = S.msgs[e.id];
-    if (!n) return;
-    if (e.meta && e.meta.action){
-      var html = actionHtml(e.meta.action);
-      if (html){
-        n.root.classList.add("act-msg");
-        n.text.innerHTML = html;
-      }
-    } else {
-      n.text.textContent = e.text || "";
-    }
-    if (e.meta && e.meta.role){
-      var who = n.root.querySelector(".who");
-      if (who && !who.parentNode.querySelector(".role")){
-        who.insertAdjacentHTML("afterend", '<span class="role">' + esc(e.meta.role) + '</span>');
-      }
-    }
-    n.think.textContent = e.thinking || "";
-    n.thinkBox.style.display = (e.thinking || "").trim() ? "block" : "none";
-    n.status.textContent = "";
-    n.root.classList.remove("thinking-now");
-    if (e.meta && e.meta.error){
-      var err = document.createElement("div");
-      err.className = "errline";
-      err.textContent = "调用失败：" + e.meta.error;
-      n.body.appendChild(err);
-    }
-    if (e.meta && e.meta.usage){
-      n.usage = e.meta.usage;
-      n.meta.textContent = (e.meta.latency_ms || 0) + "ms · " +
-        (e.meta.usage.prompt_tokens || 0) + "→" + (e.meta.usage.completion_tokens || 0) + " tok";
-    }
-    updateMetrics();
-    scrollBottom();
-    return;
-  }
-  if (e.type === "validation_failed"){
-    var vn = S.msgs[e.id];
-    if (vn){
-      var tip = document.createElement("div");
-      tip.className = "errline";
-      tip.style.color = "#b45309";
-      tip.textContent = "校验未通过：" + (e.reason || "") + "（要求重说）";
-      vn.body.appendChild(tip);
-    }
-    return;
-  }
-  if (e.type === "context_trim"){
-    $("typingHint").textContent = "上下文已裁剪 " + e.trimmed + " 条（" + e.prompt_chars + " 字）";
-    return;
-  }
-  if (e.type === "turn"){
-    if (e.state === "restart" && e.id && S.msgs[e.id]){
-      // 重试：清空这一条重来，而不是让两段拼在一起
-      S.msgs[e.id].text.textContent = "";
-      S.msgs[e.id].think.textContent = "";
-      S.msgs[e.id].status.textContent = "重新生成";
-    }
-    var a = S.agents[e.agent];
-    $("typingHint").textContent = e.state === "start"
-      ? ("正在等待 " + (a ? a.name : (e.agent + "号")) + " 回应…")
-      : "空闲";
-    if (a){
-      var dot = document.querySelector('[data-agent-dot="' + e.agent + '"]');
-      if (dot) dot.classList.toggle("on", e.state === "start");
-    }
-    return;
-  }
-  if (e.type === "session"){
-    setState(e.state, e.winner);
-    $("typingHint").textContent = e.state === "ended" ? "会话已结束" : "空闲";
-    updateMetrics();
-    return;
-  }
-}
-
-var CHIP = {
-  kill:   {cls:"kill",   label:"刀"},
-  check:  {cls:"check",  label:"查"},
-  poison: {cls:"poison", label:"毒"},
-  save:   {cls:"poison", label:"救"},
-  guard:  {cls:"check",  label:"守"},
-  vote:   {cls:"vote",   label:"票"},
-  shoot:  {cls:"kill",   label:"开枪"},
-  pass_badge: {cls:"badge", label:"警徽"},
-  destruct:   {cls:"badge", label:"自爆"},
-  abstain:    {cls:"", label:"弃权"},
-  destroy:    {cls:"badge", label:"警徽作废"}
-};
-function actionHtml(action){
-  if (!action) return null;
-  var kind = action.kind || "";
-  var c = CHIP[kind];
-  if (!c) return null;
-  var target = action.target;
-  var arrow = (target !== undefined && target !== null && target !== "")
-    ? '<span class="arr">→</span><b>' + esc(target) + '</b>&nbsp;号' : "";
-  return '<span class="chip ' + c.cls + '">' + esc(c.label) + '</span>' + arrow;
-}
-
-function addBubble(m){
-  var stream = $("stream");
-  if (m.kind === "system"){
-    var d = document.createElement("div");
-    d.className = "sys";
-    d.textContent = (m.channel === "meta" ? "〔仅观察者〕" : "") + (m.text || "");
-    stream.appendChild(d);
-    scrollBottom();
-    return;
-  }
-  var root = document.createElement("div");
-  root.className = "msg thinking-now" + (m.kind === "action" ? " act-msg" : "");
-  var meta = m.meta || {};
-  var agent = S.agents[m.sender] || {};
-  var role = meta.role ? '<span class="role">' + esc(meta.role) + '</span>' : '';
-  var modelName = meta.model || agent.model || '';
-  root.innerHTML =
-    '<div class="ava" style="background:' + colorFor(m.sender) + '">' + esc(m.sender) + '</div>' +
-    '<div class="body">' +
-      '<div class="head"><span class="who">' + esc(m.sender_name) + '</span>' + role +
-      '<span class="mdl">' + esc(modelName) + '</span>' +
-      '<span class="meta"></span><span class="meta status"></span></div>' +
-      '<div class="bubble"><span class="text"></span></div>' +
-      '<details class="think" style="display:none"><summary></summary><div class="t"></div></details>' +
-    '</div>';
-  stream.appendChild(root);
-  var node = {
-    root: root,
-    text: root.querySelector(".text"),
-    think: root.querySelector(".think .t"),
-    thinkBox: root.querySelector(".think"),
-    status: root.querySelector(".status"),
-    meta: root.querySelector(".meta"),
-    body: root.querySelector(".body"),
-  };
-  S.msgs[m.id] = node;
-  $("msgCount").textContent = Object.keys(S.msgs).length;
-  scrollBottom();
-}
-
-function renderMembers(){
-  var ids = Object.keys(S.agents);
-  var alive = S.alive;
-  $("members").innerHTML = ids.length ? ids.map(function(id){
-    var a = S.agents[id];
-    var isAlive = !alive || alive.indexOf(Number(id)) >= 0;
-    var marks = "";
-    if (String(S.sheriff) === String(id)) marks += '<span class="role" title="警长">警长</span>';
-    if ((S.revealed || []).indexOf(Number(id)) >= 0) marks += '<span class="role" title="已翻牌">翻牌</span>';
-    return '<div class="member' + (isAlive ? '' : ' out') + '">' +
-      '<span class="dot" data-agent-dot="' + id + '" style="' + (isAlive ? '' : 'background:#d5dae2') + '"></span>' +
-      '<span class="ava" style="width:22px;height:22px;border-radius:7px;font-size:11px;background:' +
-        colorFor(id) + '">' + id + '</span>' +
-      '<span class="nm">' + esc(a.name) + '</span>' + marks +
-      '<span class="md">' + esc(a.model || '') + '</span></div>';
-  }).join("") : '<div class="hint">—</div>';
-}
-
-function updateMetrics(){
-  var n = Object.keys(S.msgs).length;
-  $("msgCount").textContent = n;
-  var pin = 0, pout = 0, pcached = 0;
-  Object.keys(S.msgs).forEach(function(id){
-    var meta = S.msgs[id] && S.msgs[id].usage;
-    if (!meta) return;
-    pin += meta.prompt_tokens || 0;
-    pout += meta.completion_tokens || 0;
-    pcached += (meta.prompt_tokens_details && meta.prompt_tokens_details.cached_tokens) || 0;
-  });
-  $("metrics").innerHTML =
-    '<div class="kv"><span>消息</span><b>' + n + '</b></div>' +
-    '<div class="kv"><span>参与者</span><b>' + Object.keys(S.agents).length + '</b></div>' +
-    '<div class="kv"><span>输入 tok</span><b>' + pin + '</b></div>' +
-    '<div class="kv"><span>输出 tok</span><b>' + pout + '</b></div>' +
-    '<div class="kv"><span>命中缓存</span><b>' + pcached + '</b></div>';
-}
-
-function stateText(state){
-  var map = { created: "准备中", running: "进行中", ended: "已结束", closed: "已关闭" };
-  return map[state] || state;
-}
-function setState(state, winner){
-  $("statePill").innerHTML = "状态 <b>" + stateText(state) + "</b>" +
-    (winner ? " · 胜方 <b>" + esc(winner) + "</b>" : "");
-}
-
 function nearBottom(){
   var el = $("stream");
   return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
@@ -576,22 +216,399 @@ function scrollBottom(force){
   var el = $("stream");
   if (force || S.stick) el.scrollTop = el.scrollHeight;
 }
+function stateText(st){
+  return { created:"准备中", running:"进行中", ended:"已结束", closed:"已关闭" }[st] || st;
+}
+function setState(st, winner){
+  $("statePill").innerHTML = "状态 <b>" + stateText(st) + "</b>" +
+    (winner ? " · 胜方 <b>" + esc(winner) + "</b>" : "");
+}
 
-// ---------- 绑定 ----------
+/* ---------- 渲染：裁判 / 回合 / 条目 ---------- */
+function addReferee(m){
+  var d = document.createElement("div");
+  d.className = "ref" + (m.channel === "meta" ? " private" : "");
+  d.innerHTML = '<span class="who">裁判</span><span class="txt"></span>';
+  d.querySelector(".txt").textContent = m.text || "";
+  $("stream").appendChild(d);
+  scrollBottom();
+}
+
+function createRound(rnd){
+  var box = document.createElement("div");
+  box.className = "round" + (rnd.channel === "wolves" ? " wolves" : "") +
+    (rnd.kind === "vote" ? " votebox" : "");
+  box.innerHTML = '<div class="round-head"><span class="rt"></span>' +
+    '<span class="rs"></span><span class="rx"></span></div>' +
+    '<div class="round-body"></div>';
+  box.querySelector(".rt").textContent = rnd.title || "";
+  box.querySelector(".rs").textContent = rnd.subtitle || "";
+  $("stream").appendChild(box);
+  var obj = { root: box, body: box.querySelector(".round-body"),
+              summary: box.querySelector(".rx"), items: {}, kind: rnd.kind || "group",
+              votes: null };
+  S.rounds[rnd.id] = obj;
+  scrollBottom();
+  return obj;
+}
+function ensureRound(id, meta){
+  if (!id) return null;
+  return S.rounds[id] || createRound(meta || { id:id, title:"" });
+}
+
+var CHIP = { kill:{c:"kill",l:"刀"}, check:{c:"check",l:"查"}, poison:{c:"poison",l:"毒"},
+             save:{c:"poison",l:"救"}, guard:{c:"check",l:"守"}, vote:{c:"vote",l:"票"},
+             shoot:{c:"kill",l:"开枪"}, pass_badge:{c:"badge",l:"警徽"},
+             destruct:{c:"badge",l:"自爆"}, destroy:{c:"badge",l:"作废"},
+             abstain:{c:"",l:"弃权"}, pass:{c:"",l:"空过"} };
+function chipHtml(action){
+  if (!action) return "";
+  var c = CHIP[action.kind] || { c:"", l: action.kind || "" };
+  var t = (action.target !== undefined && action.target !== null && action.target !== "")
+    ? ' → <b>' + esc(action.target) + '</b> 号' : "";
+  return '<span class="chip ' + c.c + '">' + esc(c.l) + '</span>' + t;
+}
+
+var VOTE_LIKE = { day_vote:1, sheriff_vote:1 };
+function addItem(roundId, m){
+  var rd = ensureRound(roundId);
+  if (!rd) return null;
+  if (rd.kind === "vote") return addVote(rd, m);
+  var role = (m.meta && m.meta.role) ? '<span class="role">' + esc(m.meta.role) + '</span>' : "";
+  var model = (m.meta && m.meta.model) ? '<span class="mdl">' + esc(m.meta.model) + '</span>' : "";
+  var row = document.createElement("div");
+  row.className = "item";
+  row.innerHTML =
+    '<span class="seat" style="background:' + colorFor(m.sender) + '">' + esc(m.sender) + '</span>' +
+    '<div class="ibody">' +
+      '<div class="ihead"><span class="who">' + esc(m.sender_name) + '</span>' + role + model +
+      '<span class="lat"></span></div>' +
+      '<div class="c"></div>' +
+      '<details class="think" style="display:none"><summary></summary><div class="t"></div></details>' +
+    '</div>';
+  rd.body.appendChild(row);
+  var node = { root: row, text: row.querySelector(".c"), body: row.querySelector(".ibody"),
+               think: row.querySelector(".think .t"), thinkBox: row.querySelector(".think"),
+               lat: row.querySelector(".lat") };
+  S.msgs[m.id] = node;
+  scrollBottom();
+  return node;
+}
+
+function addVote(rd, m){
+  if (!rd.votes){
+    rd.votes = document.createElement("div");
+    rd.votes.className = "votes";
+    rd.body.appendChild(rd.votes);
+  }
+  var chip = document.createElement("span");
+  chip.className = "vchip";
+  chip.innerHTML = '<span class="seat" style="width:16px;height:16px;border-radius:5px;' +
+    'font-size:9.5px;background:' + colorFor(m.sender) + '">' + esc(m.sender) + '</span>' +
+    '<span class="c"></span>';
+  rd.votes.appendChild(chip);
+  var node = { root: chip, text: chip.querySelector(".c"), body: rd.votes,
+               think: document.createElement("span"), thinkBox: {style:{}, open:false},
+               lat: document.createElement("span") };
+  S.msgs[m.id] = node;
+  return node;
+}
+
+function addMessage(m){
+  if (m.kind === "referee" || m.kind === "system"){ addReferee(m); return; }
+  var node = m.round ? addItem(m.round, m) : addItem(null, m);
+  if (!node && !m.round){
+    // 没有回合归属的自由消息：单独一条
+    node = addItem("__solo", m);
+  }
+}
+
+function finalize(node, text, thinking, meta){
+  if (!node) return;
+  var isVote = node.root && node.root.className === "vchip";
+  if (isVote){
+    var a = (meta && meta.action) || {};
+    if (a.kind === "vote" && a.target){
+      node.text.textContent = "→ " + a.target;
+    } else if (a.kind === "vote" || a.kind === "abstain"){
+      node.text.textContent = "弃权";
+      node.root.classList.add("abstain");
+    } else {
+      node.text.textContent = "—";
+    }
+  } else if (meta && meta.action && meta.action.kind && meta.action.kind !== "speak"){
+    node.text.innerHTML = chipHtml(meta.action);
+  } else {
+    node.text.textContent = text || "";
+  }
+  if (thinking && thinking.trim()){
+    node.think.textContent = thinking;
+    node.thinkBox.style.display = "block";
+    node.thinkBox.open = false;
+  }
+  if (meta && meta.usage){
+    node.lat.textContent = (meta.latency_ms || 0) + "ms";
+  } else if (meta && meta.latency_ms){
+    node.lat.textContent = meta.latency_ms + "ms";
+  }
+}
+
+/* ---------- 渲染：成员 / 指标 ---------- */
+function renderMembers(){
+  var ids = Object.keys(S.agents);
+  $("members").innerHTML = ids.length ? ids.map(function(id){
+    var a = S.agents[id];
+    var isAlive = !S.alive || S.alive.indexOf(Number(id)) >= 0;
+    var tags = "";
+    if (String(S.sheriff) === String(id)) tags += '<span class="tag">警长</span>';
+    if ((S.revealed || []).indexOf(Number(id)) >= 0) tags += '<span class="tag">翻牌</span>';
+    return '<div class="member' + (isAlive ? '' : ' out') + '">' +
+      '<span class="seat" style="width:20px;height:20px;border-radius:6px;font-size:10.5px;background:' +
+        colorFor(id) + '">' + id + '</span>' +
+      '<span class="nm">' + esc(a.name) + '</span>' +
+      (a.role ? '<span class="role">' + esc(a.role) + '</span>' : '') + tags +
+      '<span class="md">' + esc(a.model || '') + '</span></div>';
+  }).join("") : '<div class="hint">—</div>';
+}
+
+function updateMetrics(){
+  var n = Object.keys(S.msgs).length;
+  $("msgCount").textContent = n;
+  var pin = 0, pout = 0;
+  Object.keys(S.msgs).forEach(function(id){
+    var u = S.msgs[id] && S.msgs[id].usage;
+    if (!u) return;
+    pin += u.prompt_tokens || 0; pout += u.completion_tokens || 0;
+  });
+  $("metrics").innerHTML =
+    '<div class="kv"><span>回合</span><b>' + Object.keys(S.rounds).length + '</b></div>' +
+    '<div class="kv"><span>消息</span><b>' + n + '</b></div>' +
+    '<div class="kv"><span>参与者</span><b>' + Object.keys(S.agents).length + '</b></div>' +
+    '<div class="kv"><span>输入 tok</span><b>' + pin + '</b></div>' +
+    '<div class="kv"><span>输出 tok</span><b>' + pout + '</b></div>';
+}
+
+/* ---------- 事件 ---------- */
+function handleEvent(e){
+  if (e.type === "snapshot"){
+    $("pluginName").textContent = e.scenario || "—";
+    (e.agents || []).forEach(function(a){ S.agents[a.id] = a; });
+    S.alive = e.alive || null; S.sheriff = e.sheriff; S.revealed = e.revealed || [];
+    renderMembers(); setState(e.state, e.winner);
+    return;
+  }
+  if (e.type === "state"){
+    S.alive = e.alive || S.alive; S.sheriff = e.sheriff; S.revealed = e.revealed || [];
+    renderMembers(); return;
+  }
+  if (e.type === "round_start"){
+    createRound(e.round); updateMetrics(); return;
+  }
+  if (e.type === "round_end"){
+    var rd = S.rounds[e.round];
+    if (rd) rd.summary.textContent = e.summary || "";
+    scrollBottom(); return;
+  }
+  if (e.type === "message_start"){
+    var m = e.message;
+    if (S.msgs[m.id]) return;
+    addMessage(m); updateMetrics(); return;
+  }
+  if (e.type === "delta"){
+    var n = S.msgs[e.id];
+    if (!n) return;
+    if (e.field === "thinking"){
+      n.think.textContent += e.text;
+      n.thinkBox.style.display = "block";
+      n.thinkBox.open = true;
+    } else {
+      n.text.textContent += e.text;
+    }
+    scrollBottom(); return;
+  }
+  if (e.type === "message_end"){
+    var node = S.msgs[e.id];
+    if (!node) return;
+    finalize(node, e.text, e.thinking, e.meta);
+    if (e.meta && e.meta.role && !node.root.querySelector(".role")){
+      var who = node.root.querySelector(".who");
+      if (who) who.insertAdjacentHTML("afterend", '<span class="role">' + esc(e.meta.role) + '</span>');
+    }
+    if (e.meta && e.meta.usage) node.usage = e.meta.usage;
+    if (e.meta && e.meta.rejections && e.meta.rejections.length){
+      var err = document.createElement("div");
+      err.className = "errline";
+      err.textContent = "校验重说 " + e.meta.rejections.length + " 次：" + e.meta.rejections[0];
+      node.body.appendChild(err);
+    }
+    updateMetrics(); scrollBottom(); return;
+  }
+  if (e.type === "turn"){
+    if (e.state === "restart" && e.id && S.msgs[e.id]){
+      S.msgs[e.id].text.textContent = "";
+      S.msgs[e.id].think.textContent = "";
+    }
+    var a = S.agents[e.agent];
+    $("typingHint").textContent = e.state === "start"
+      ? ("正在等待 " + (a ? a.name : e.agent + " 号") + " 行动…") : "空闲";
+    return;
+  }
+  if (e.type === "session"){
+    setState(e.state, e.winner);
+    $("typingHint").textContent = e.state === "ended" ? "对局已结束" : "空闲";
+    return;
+  }
+}
+
+/* ---------- 连接 ---------- */
+function attach(sid){
+  if (S.es){ S.es.close(); S.es = null; }
+  S.cur = sid; S.msgs = {}; S.rounds = {}; S.agents = {}; S.retry = 0; S.stick = true;
+  $("stream").innerHTML = ""; banner(""); loadSessions();
+  api("/api/sessions/" + encodeURIComponent(sid)).then(function(d){
+    if (!d.ok){ banner("这个会话已经不在了（服务重启过，内存会话会丢失）。"); return; }
+    var es = new EventSource("/api/sessions/" + encodeURIComponent(sid) + "/stream");
+    S.es = es;
+    es.onmessage = function(ev){
+      var data; try { data = JSON.parse(ev.data); } catch (err) { return; }
+      S.retry = 0; banner(""); handleEvent(data);
+    };
+    es.onerror = function(){
+      S.retry++;
+      banner(S.retry >= 4 ? "连接中断：服务可能已重启，这一局已失效。"
+                          : "连接中断，正在重连（第 " + S.retry + " 次）…");
+    };
+  });
+}
+
+function attachStatic(sid){
+  S.cur = sid; S.msgs = {}; S.rounds = {}; S.agents = {};
+  $("stream").innerHTML = "";
+  return api("/api/sessions/" + encodeURIComponent(sid)).then(function(d){
+    if (!d.ok){ $("stream").innerHTML = '<div class="hint">会话不存在</div>'; return; }
+    var s = d.session;
+    $("pluginName").textContent = s.scenario || "—";
+    (s.agents || []).forEach(function(a){ S.agents[a.id] = a; });
+    S.alive = s.alive || null; S.sheriff = s.sheriff; S.revealed = s.revealed || [];
+    renderMembers(); setState(s.state, s.winner);
+    var rounds = {};
+    (s.rounds || []).forEach(function(r){ rounds[r.id] = r; });
+    (s.messages || []).forEach(function(m){
+      if (m.kind === "referee" || m.kind === "system"){ addReferee(m); return; }
+      var rid = (m.meta && m.meta.round) || null;
+      if (rid && !S.rounds[rid]) createRound(rounds[rid] || { id:rid, title:"" });
+      var node = addItem(rid, m);
+      finalize(node, m.text, m.thinking, m.meta);
+      if (m.meta && m.meta.role && node && !node.root.querySelector(".role")){
+        var who = node.root.querySelector(".who");
+        if (who) who.insertAdjacentHTML("afterend", '<span class="role">' + esc(m.meta.role) + '</span>');
+      }
+    });
+    (s.rounds || []).forEach(function(r){
+      var rd = S.rounds[r.id];
+      if (rd && r.summary) rd.summary.textContent = r.summary;
+    });
+    updateMetrics(); S.stick = true; scrollBottom(true);
+  });
+}
+
+/* ---------- 会话列表 / 新建 ---------- */
+function loadSessions(){
+  return api("/api/sessions").then(function(d){
+    S.sessions = d.sessions || [];
+    $("sessList").innerHTML = S.sessions.length ? S.sessions.map(function(s){
+      return '<button class="sess' + (S.cur === s.id ? " on" : "") + '" data-id="' + esc(s.id) + '">' +
+        '<div class="t">' + esc(s.title) + '</div>' +
+        '<div class="s">' + esc(s.scenario) + ' · ' + s.messages + ' 条 · ' + esc(stateText(s.state)) +
+        '</div></button>';
+    }).join("") : '<div class="hint">还没有会话</div>';
+  });
+}
+function loadPlugins(){
+  return api("/api/plugins").then(function(d){ S.plugins = d.plugins || []; renderPluginOptions(); });
+}
+function loadModels(){
+  return api("/api/models").then(function(d){ S.models = d.models || []; });
+}
+function currentPlugin(){
+  var id = $("pluginSel").value;
+  return S.plugins.filter(function(p){ return p.id === id; })[0];
+}
+function renderPluginOptions(){
+  $("pluginSel").innerHTML = S.plugins.map(function(p){
+    return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>';
+  }).join("");
+  renderConfig(); renderSeats(12);
+}
+function renderConfig(){
+  var p = currentPlugin(); var box = $("configBox");
+  if (!p || !p.default_config){ box.innerHTML = ""; return; }
+  box.innerHTML = Object.keys(p.default_config).map(function(k){
+    var v = p.default_config[k];
+    var t = typeof v === "number" ? "number" : "text";
+    return '<div><label>' + esc(k) + '</label><input data-cfg="' + esc(k) + '" type="' + t +
+      '" value="' + esc(v) + '"></div>';
+  }).join("");
+}
+function modelOptions(sel){
+  if (!S.models.length) return '<option value="">（先添加模型）</option>';
+  return S.models.map(function(m){
+    return '<option value="' + esc(m.id) + '"' + (m.id === sel ? " selected" : "") + '>' +
+      esc(m.name) + '</option>';
+  }).join("");
+}
+function renderSeats(n){
+  var box = $("seats");
+  if (box.querySelectorAll("select").length === n) return;
+  box.innerHTML = "";
+  for (var i = 1; i <= n; i++){
+    var d = document.createElement("div");
+    d.className = "seatrow";
+    var preset = S.models[(i - 1) % Math.max(1, S.models.length)];
+    d.innerHTML = '<span class="hint">' + i + ' 号</span>' +
+      '<select class="mdl">' + modelOptions(preset ? preset.id : "") + '</select>';
+    box.appendChild(d);
+  }
+}
+function openModal(){ $("modal").classList.add("show"); }
+function closeModal(){ $("modal").classList.remove("show"); }
+function startSession(){
+  var p = currentPlugin();
+  if (!p) return;
+  var config = {};
+  Array.prototype.forEach.call(document.querySelectorAll("[data-cfg]"), function(el){
+    config[el.getAttribute("data-cfg")] = el.type === "number" ? Number(el.value) : el.value;
+  });
+  var seats = [];
+  Array.prototype.forEach.call(document.querySelectorAll("#seats .mdl"), function(sel, i){
+    seats.push({ model_id: sel.value, name: (i + 1) + "号" });
+  });
+  if (seats.some(function(s){ return !s.model_id; })){ alert("每个座位都要选模型"); return; }
+  $("btnStart").disabled = true;
+  api("/api/sessions", { method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ plugin:p.id, config:config, seats:seats,
+                           title: $("titleInput").value || p.name })
+  }).then(function(d){
+    $("btnStart").disabled = false;
+    if (!d.ok){ alert(d.error || "创建失败"); return; }
+    closeModal(); attach(d.session.id);
+  }).catch(function(){ $("btnStart").disabled = false; });
+}
+
+/* ---------- 绑定 ---------- */
 $("stream").addEventListener("scroll", function(){ S.stick = nearBottom(); });
 $("btnNew").onclick = openModal;
 $("btnCancel").onclick = closeModal;
 $("btnStart").onclick = startSession;
-$("pluginSel").onchange = function(){ renderConfig(); };
-$("btnAddSeat").onclick = function(){ renderSeats(document.querySelectorAll("#seats .mdl").length + 1); };
+$("pluginSel").onchange = renderConfig;
+$("btnAddSeat").onclick = function(){
+  renderSeats(document.querySelectorAll("#seats .mdl").length + 1);
+};
 $("sessList").onclick = function(ev){
   var t = ev.target.closest ? ev.target.closest("[data-id]") : null;
-  if (!t) return;
-  attach(t.getAttribute("data-id"));
+  if (t) attach(t.getAttribute("data-id"));
 };
-
 loadPlugins().then(loadModels).then(loadSessions).then(function(){
-  if (S.models.length === 0) $("seatHint").textContent = "先在「模型管理」页添加模型";
   var q = new URLSearchParams(location.search);
   var want = q.get("session");
   if (want){ q.has("static") ? attachStatic(want) : attach(want); }
