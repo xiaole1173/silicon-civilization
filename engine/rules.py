@@ -113,6 +113,8 @@ def validate_action(state: GameState, seat: int, action: dict, *, context: str) 
         return True, ""
 
     if context == "day_vote":
+        if seat in state.revealed:
+            return False, "你已经翻牌，没有投票权了"
         if kind not in ("vote", "abstain"):
             return False, "白天只能 vote 或 abstain"
         if kind == "vote":
@@ -256,6 +258,15 @@ def apply_deaths(state: GameState, deaths: list[dict]) -> list[dict]:
             applied.append({"seat": seat, "role": state.role_of(seat),
                             "cause": d.get("cause", "")})
     return applied
+
+
+def resolve_vote_death(state: GameState, seat: int) -> dict:
+    """投票出局结算：白痴首次被票出时翻牌免死（之后失去投票权）。"""
+    if state.role_of(seat) == "idiot" and seat not in state.revealed:
+        state.revealed.add(seat)
+        return {"died": False, "revealed": True, "seat": seat,
+                "role": "idiot", "reason": "白痴翻牌，免于出局"}
+    return {"died": True, "revealed": False, "seat": seat, "role": state.role_of(seat)}
 
 
 def can_hunter_shoot(state: GameState, seat: int, cause: str) -> bool:

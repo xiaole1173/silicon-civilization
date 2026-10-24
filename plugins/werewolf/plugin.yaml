@@ -1,0 +1,7 @@
+id: werewolf
+name: 狼人杀
+description: 12/9 人狼人杀：夜晚密商刀人、查验、用药、守护，白天陈述、表决、遗言。
+default_config:
+  scenario: scenarios/werewolf12.yaml
+  seed: 1
+  rounds_per_day: 1

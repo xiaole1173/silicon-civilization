@@ -17,6 +17,7 @@ class GameState:
     phase: str = "init"
     witch_stock: dict = field(default_factory=lambda: {"antidote": 1, "poison": 1})
     guard_last: int | None = None      # 守卫上一晚守的人（不能连守同一人）
+    revealed: set = field(default_factory=set)   # 已翻牌的白痴（免死但失去投票权）
     deaths_last_night: list[dict] = field(default_factory=list)
     transcript: list[dict] = field(default_factory=list)       # 公开发言
     wolf_transcript: list[dict] = field(default_factory=list)  # 狼队夜间密聊（仅狼可见）

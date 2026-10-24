@@ -35,7 +35,7 @@ roles:
 witch:
   antidote: 1
   poison: 1
-  allow_self_save: true      # 女巫能否救自己
+  allow_self_save: false    # 官方规则：女巫不可自救      # 女巫能否救自己
   same_night_potion: false   # 单夜能否同时用两瓶
   poison_can_hit_hunter: true
 

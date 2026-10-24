@@ -1,6 +1,6 @@
 # 狼人杀 12 人标准局（4 狼 + 4 神 + 4 民）
 # 神职：预言家 / 女巫 / 猎人 / 守卫
-name: 12 人标准局
+name: 12 人守卫局（含守卫，非官方标准场）
 players: 12
 
 # 情境设定：把机制包进拟真叙事（模型看到的是"处境"，不是"游戏规则"）
@@ -33,7 +33,7 @@ roles:
 witch:
   antidote: 1
   poison: 1
-  allow_self_save: true
+  allow_self_save: false    # 官方规则：女巫不可自救
   same_night_potion: false
   poison_can_hit_hunter: true
 

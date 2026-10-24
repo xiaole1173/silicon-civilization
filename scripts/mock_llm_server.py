@@ -22,6 +22,10 @@ def parse_ctx(user_text: str) -> dict:
     m = re.search(r"当前存活：([\d、]+)", user_text)
     if m:
         alive = [int(x) for x in m.group(1).split("、") if x.strip().isdigit()]
+    if not alive:
+        m = re.search(r"在场：(.+)", user_text)
+        if m:
+            alive = [int(x) for x in re.findall(r"(\d+)[（(]", m.group(1))]
     return {"seat": seat, "alive": alive, "text": user_text}
 
 

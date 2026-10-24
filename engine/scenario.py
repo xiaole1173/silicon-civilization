@@ -10,9 +10,9 @@ try:
 except ImportError:  # pragma: no cover
     yaml = None
 
-SUPPORTED_ROLES = ("werewolf", "seer", "witch", "hunter", "guard", "villager")
-GOOD_ROLES = ("seer", "witch", "hunter", "guard", "villager")
-GOD_ROLES = ("seer", "witch", "hunter", "guard")
+SUPPORTED_ROLES = ("werewolf", "seer", "witch", "hunter", "guard", "idiot", "villager")
+GOOD_ROLES = ("seer", "witch", "hunter", "guard", "idiot", "villager")
+GOD_ROLES = ("seer", "witch", "hunter", "guard", "idiot")
 
 
 class ScenarioError(ValueError):
@@ -86,7 +86,8 @@ class Scenario:
             raise ScenarioError("至少需要一个好人")
         self.witch.setdefault("antidote", 1)
         self.witch.setdefault("poison", 1)
-        self.witch.setdefault("allow_self_save", True)
+        # 官方标准场：女巫不可自救、每晚最多一瓶
+        self.witch.setdefault("allow_self_save", False)
         self.witch.setdefault("same_night_potion", False)
         self.guard.setdefault("enabled", int(self.roles.get("guard", 0)) > 0)
         self.guard.setdefault("allow_self", True)
@@ -136,6 +137,7 @@ class Scenario:
         "witch": "女巫",
         "hunter": "猎人",
         "guard": "守卫",
+        "idiot": "白痴",
         "villager": "村民",
     }
 
