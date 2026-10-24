@@ -120,7 +120,7 @@ def main():
             req = urllib.request.Request(SITE_URL, headers={"User-Agent": "dsh"})
             with urllib.request.urlopen(req, timeout=20) as r:
                 html = r.read().decode("utf-8", "ignore")
-            ok = "蔡朝彬" in html
+            ok = "xiaole1173" in html
             print(f"  {SITE_URL} -> HTTP 200，内容校验：{'通过' if ok else '页面已通但内容待确认'}")
             if ok:
                 print("发布完成")
