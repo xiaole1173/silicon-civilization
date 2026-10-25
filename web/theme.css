@@ -200,3 +200,20 @@ th{ font-size: var(--fs-12); color: var(--on-surface-mid); font-weight: 600; }
   width: 34px; height: 34px; padding: 0; border-radius: var(--r-pill);
   display: inline-flex; align-items: center; justify-content: center;
 }
+
+/* ---------- 全站导航 ---------- */
+.topnav{ display: flex; gap: 2px; margin-left: var(--sp-2); }
+.topnav a{
+  font-size: var(--fs-13); color: var(--on-surface-mid); text-decoration: none;
+  padding: 5px 10px; border-radius: var(--r-sm); white-space: nowrap;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.topnav a:hover{ background: var(--surface-3); color: var(--on-surface); }
+.topnav a.on{ background: var(--brand-weak); color: var(--brand-weak-ink); font-weight: 600; }
+
+.topbar-fallback{
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: 8px var(--sp-4); background: var(--surface);
+  border-bottom: 1px solid var(--outline);
+}
+
