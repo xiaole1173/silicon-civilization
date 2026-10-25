@@ -106,6 +106,8 @@ def main():
     print("\n批次完成:", summary["batch_id"])
     print("  索引:", summary["index"])
     print("  清单:", summary["manifest"])
+    if summary.get("report"):
+        print("  报告:", summary["report"])
     print("  执行 {} 局，跳过 {} 局，错误 {} 个".format(
         summary["executed"], summary["skipped"], len(summary["errors"])))
 
