@@ -45,6 +45,14 @@ class BaseScenario:
         """发言校验：返回 (是否合格, 不合格原因)。不合格会带着原因让模型重说。"""
         return True, ""
 
+    def metrics(self, session) -> dict:
+        """声明本场景的指标（基座收集、聚合、导出）。通用统计用 base.metrics。"""
+        return {}
+
+    def outcome(self, session) -> dict:
+        """一局结论（胜方、轮数等），写进批次索引。"""
+        return {}
+
     # ---------- 工具 ----------
     def merged_config(self, config: dict) -> dict:
         merged = dict(self.default_config)

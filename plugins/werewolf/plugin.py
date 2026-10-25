@@ -551,6 +551,25 @@ class WerewolfPlugin(BaseScenario):
                             or "全员弃权")
         return result
 
+    # ---------- 指标与结论（基座收集） ----------
+    def metrics(self, session) -> dict:
+        st = self._state(session)
+        speaks = [m for m in session.messages if m.kind in ("speak", "action")]
+        return {
+            "days": st.day,
+            "alive_end": len(st.alive),
+            "deaths": len(st.seat_roles) - len(st.alive),
+            "rounds": len(session.rounds),
+            "utterances": len(speaks),
+            "call_errors": sum(1 for m in session.messages
+                               if (m.meta or {}).get("ok") is False),
+            "sheriff": st.sheriff or 0,
+        }
+
+    def outcome(self, session) -> dict:
+        st = self._state(session)
+        return {"winner": st.winner or "", "days": st.day}
+
     # ---------- 工具 ----------
     @staticmethod
     def _as_target(action: dict):

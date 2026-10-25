@@ -58,3 +58,13 @@ class DiscussionPlugin(BaseScenario):
                             validator=validator, retries=1 if strict else 0)
         session.narrate("讨论结束。")
         session.end()
+
+    def metrics(self, session) -> dict:
+        speaks = [m for m in session.messages if m.kind == "speak" and (m.text or "").strip()]
+        return {"messages": len(session.messages), "utterances": len(speaks),
+                "speakers": len(session.agents),
+                "avg_chars": round(sum(len(m.text or "") for m in speaks)
+                                   / max(1, len(speaks)), 1)}
+
+    def outcome(self, session) -> dict:
+        return {"topic": session.meta.get("topic", "")}

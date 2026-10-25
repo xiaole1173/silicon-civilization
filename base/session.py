@@ -82,6 +82,10 @@ class Session:
         return ch
 
     def visible_to(self, agent_id: int, msg: Message) -> bool:
+        # 消融开关：communication=off 时看不到别人的发言/动作（只看自己与旁白）
+        if str(self.config.get("communication", "on")) == "off":
+            if msg.sender is not None and msg.sender != agent_id:
+                return False
         ch = self.channels.get(msg.channel)
         return bool(ch and ch.visible_to(agent_id))
 
@@ -257,6 +261,12 @@ class Session:
     def end(self, winner=None) -> None:
         self.state = "ended"
         self.winner = winner
+        # 插件声明指标 → 基座统一收集
+        try:
+            self.meta["metrics"] = dict(self.scenario.metrics(self) or {})
+            self.meta["outcome"] = dict(self.scenario.outcome(self) or {})
+        except Exception as exc:
+            self.meta["metrics_error"] = repr(exc)
         self._publish({"type": "session", "state": "ended", "winner": winner,
                        "messages": len(self.messages)})
         self.broker.close()
