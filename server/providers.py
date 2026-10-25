@@ -153,6 +153,8 @@ def build_request(conf: dict, messages: list, *, max_tokens: int | None = None,
             payload["max_tokens"] = int(mt)
         if stream:
             payload["stream"] = True
+        if conf.get("stream_usage"):
+            payload["stream_options"] = {"include_usage": True}
         if key:
             headers["Authorization"] = "Bearer " + key
         return {"url": url, "headers": headers, "payload": payload}

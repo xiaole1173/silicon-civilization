@@ -59,6 +59,7 @@ class Session:
         self.broker = Broker()
         self.state = "created"
         self.stopped = False
+        self.reputation: dict[int, float] = {}
         self.winner = None
         self.meta: dict = {}
         self.started_at = time.time()
@@ -82,10 +83,16 @@ class Session:
         return ch
 
     def visible_to(self, agent_id: int, msg: Message) -> bool:
-        # 消融开关：communication=off 时看不到别人的发言/动作（只看自己与旁白）
+        # 消融开关 1：沟通开关
         if str(self.config.get("communication", "on")) == "off":
             if msg.sender is not None and msg.sender != agent_id:
                 return False
+        # 消融开关 2：信息可见性（full / public / self）
+        vis = str(self.config.get("info_visibility", "full"))
+        if vis == "self" and msg.sender not in (None, agent_id):
+            return False
+        if vis == "public" and msg.channel != PUBLIC:
+            return False
         ch = self.channels.get(msg.channel)
         return bool(ch and ch.visible_to(agent_id))
 
@@ -193,7 +200,15 @@ class Session:
                 protocol = providers.resolve_protocol(conf)
                 text = providers.extract_text(resp, protocol).strip()
                 thinking = providers.extract_reasoning(resp, protocol).strip()
-                meta["usage"] = resp.get("usage") or {}
+                usage = resp.get("usage") or {}
+                if not usage:
+                    # 网关不回 usage 时按字符估算，保证成本可统计（标注为估算）
+                    prompt_chars = sum(len(m.get("content") or "") for m in messages)
+                    out_chars = len(text or "") + len(thinking or "")
+                    usage = {"prompt_tokens": int(prompt_chars / 1.6),
+                             "completion_tokens": int(out_chars / 1.6),
+                             "estimated": True}
+                meta["usage"] = usage
                 meta["ok"] = True
             except providers.ProviderError as exc:
                 meta["ok"] = False
@@ -245,6 +260,19 @@ class Session:
         self.stopped = True
         self.referee("对局被手动结束。{}".format(("原因：" + reason) if reason else ""))
         self._publish({"type": "session", "state": "ending", "reason": reason})
+
+    def adjust_reputation(self, seat: int, delta: float, reason: str = "") -> float:
+        """声誉账本：正数加分、负数减分。展示与否由 show_reputation 开关控制。"""
+        cur = float(self.reputation.get(seat, 0.0)) + float(delta)
+        self.reputation[seat] = round(cur, 2)
+        self._publish({"type": "reputation", "seat": seat,
+                       "value": self.reputation[seat], "reason": reason})
+        return self.reputation[seat]
+
+    def reputation_snapshot(self) -> dict:
+        if str(self.config.get("show_reputation", "on")) != "on":
+            return {}
+        return {str(k): v for k, v in sorted(self.reputation.items())}
 
     def publish_state(self) -> None:
         """把存活/警长等对局状态推给观察者（模型看不到，只用于界面）。"""

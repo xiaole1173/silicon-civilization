@@ -127,6 +127,15 @@ def run_batch(plugin_id: str, *, seats, base_config: dict | None = None,
             _flatten(row, "m_", (session.meta or {}).get("metrics") or {})
             row["messages"] = len(session.messages)
             row["rounds"] = len(session.rounds)
+            row["info_visibility"] = cfg.get("info_visibility", "full")
+            row["show_reputation"] = cfg.get("show_reputation", "on")
+            usages = [((m.meta or {}).get("usage") or {}) for m in session.messages]
+            t_in = sum(int(u.get("prompt_tokens") or 0) for u in usages)
+            t_out = sum(int(u.get("completion_tokens") or 0) for u in usages)
+            row["tokens_in"] = t_in
+            row["tokens_out"] = t_out
+            row["tokens_total"] = t_in + t_out
+            row["usage_estimated"] = any(bool(u.get("estimated")) for u in usages)
         except Exception as exc:
             row["state"] = "error"
             row["error"] = repr(exc)[:200]
@@ -143,6 +152,14 @@ def run_batch(plugin_id: str, *, seats, base_config: dict | None = None,
                "manifest": manifest_path, "runs": len(specs),
                "executed": executed, "skipped": len(done),
                "errors": errors, "dir": str(out_dir)}
+    try:
+        import base.report as report_mod
+        md = report_mod.build(rows, manifest)
+        report_path = report_mod.write(str(out_dir / "REPORT.md"), md)
+        summary["report"] = report_path
+    except Exception as exc:
+        summary["report_error"] = repr(exc)
+
     with open(out_dir / "summary.json", "w", encoding="utf-8") as fh:
         import json
         json.dump(summary, fh, ensure_ascii=False, indent=2)
