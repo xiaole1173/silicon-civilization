@@ -588,7 +588,8 @@ class WerewolfPlugin(BaseScenario):
 
         tag = ep.CONTEXT_TAG.get(context, "")
         schema = ep.SCHEMA_TEXT.get(context, "")
-        prompt = "{}{}\n输出格式：{}".format(tag, instruction, schema)
+        prompt = "{}{}\n只输出一个 JSON 对象，不要解释、不要代码围栏。\n输出格式：{}".format(
+            tag, instruction, schema)
         msg = session.ask(agent, prompt,
                           channel=self._channel_for(context, seat, channel),
                           kind="speak", budget=BUDGET.get(context, 1024),
@@ -599,8 +600,16 @@ class WerewolfPlugin(BaseScenario):
             session.referee("{} 号调用失败：{}".format(
                 seat, (msg.meta or {}).get("error", "未知错误")), public=False)
         action = ep.parse_action(raw)
+        fallback = {"kind": "abstain"} if context == "day_vote" else {"kind": "pass"}
         if not action:
-            action = {"kind": "abstain"} if context == "day_vote" else {"kind": "pass"}
+            action = fallback
+        else:
+            # 二次校验：重试用尽后模型可能仍给出非法动作（如投自己），绝不能放行
+            ok, reason = rules.validate_action(st, seat, action, context=context)
+            if not ok:
+                session.referee("{} 号的动作被判非法（{}），按弃权/跳过处理".format(seat, reason),
+                                public=False)
+                action = fallback
 
         if msg is not None:
             if action.get("kind") == "speak" and action.get("text"):

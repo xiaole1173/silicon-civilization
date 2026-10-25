@@ -303,7 +303,12 @@ function ensureRound(id, meta){
   if (S.rounds[id]) return S.rounds[id];
   var info = meta || S.roundMeta[id] || { id: id, title: "" };
   if (!info.kind && KIND_BY_TITLE[info.title]) info = Object.assign({}, info, { kind: KIND_BY_TITLE[info.title] });
-  return createRound(info);
+  var rd = createRound(info);
+  // 刷新后 round_end 事件不会重放：从快照里补回结论
+  if (rd && info.summary && rd.summary && !rd.summary.textContent){
+    rd.summary.textContent = info.summary;
+  }
+  return rd;
 }
 
 var CHIP = { kill:{c:"kill",l:"刀"}, check:{c:"check",l:"查"}, poison:{c:"poison",l:"毒"},
@@ -382,21 +387,36 @@ function finalize(node, text, thinking, meta){
   if (!node) return;
   var isVote = node.root && node.root.className === "vchip";
   if (isVote){
-    if (thinking && thinking.trim() && node.round && node.round.vthink){
+    // 思考只记一次（patch_message 会重复发 message_end）
+    if (thinking && thinking.trim() && !node.thinkDone && node.round && node.round.vthink){
       var t = document.createElement("div");
       t.className = "vt";
       t.innerHTML = '<b>' + esc(node.senderName || node.sender) + '</b>：';
       t.appendChild(document.createTextNode(thinking.trim()));
       node.round.vthink.appendChild(t);
+      node.thinkDone = true;
     }
     var a = (meta && meta.action) || {};
+    var KIND_LABEL = { run: "上警", pass: "不上警", withdraw: "退水", stay: "不退水",
+                       destruct: "自爆", destroy: "作废", save: "救", poison: "毒",
+                       guard: "守", check: "查", kill: "刀", shoot: "开枪" };
     if (a.target){
       node.text.textContent = "→ " + a.target;
     } else if (a.kind === "vote" || a.kind === "abstain"){
       node.text.textContent = "弃权";
       node.root.classList.add("abstain");
+    } else if (KIND_LABEL[a.kind]){
+      node.text.textContent = KIND_LABEL[a.kind];
+    } else if (meta && (meta.rejections || []).length){
+      node.text.textContent = "格式错误";
+      node.root.classList.add("abstain");
+      node.root.title = meta.rejections[0];
     } else {
-      node.text.textContent = "—";
+      node.text.textContent = "未表态";
+      node.root.classList.add("abstain");
+    }
+    if (meta && meta.rejections && meta.rejections.length){
+      node.root.title = "重说 " + meta.rejections.length + " 次：" + meta.rejections[0];
     }
   } else if (meta && meta.action && meta.action.kind && meta.action.kind !== "speak"){
     node.text.innerHTML = chipHtml(meta.action);

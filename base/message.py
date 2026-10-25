@@ -53,4 +53,6 @@ class Message:
             "sender": self.sender, "sender_name": self.sender_name,
             "kind": self.kind, "text": self.text, "thinking": self.thinking,
             "meta": self.meta, "ts": self.ts,
+            # 刷新/重连时靠这个字段把消息归回原来的回合卡
+            "round": (self.meta or {}).get("round", ""),
         }
