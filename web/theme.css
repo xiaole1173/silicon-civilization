@@ -1,0 +1,202 @@
+/* ============================================================
+ * theme.css — 全局设计令牌与基础组件（Material-inspired）
+ * 迁移自 docs/DESIGN.md。所有页面只引用这里的变量与组件类。
+ * 主题切换：<html data-theme="light|dark">，默认 light。
+ * 品牌色：--brand 可被任意页面覆盖（预留多主题）。
+ * ============================================================ */
+
+:root{
+  /* 品牌色：偏黑灰（可整体替换） */
+  --brand:            #2b2f36;
+  --brand-hover:      #3a3f47;
+  --brand-press:      #1f2329;
+  --on-brand:         #ffffff;
+  --brand-weak:       #eef0f3;   /* 浅底强调 */
+  --brand-weak-ink:   #2b2f36;
+
+  /* 表面与文字（light） */
+  --bg:               #f5f6f8;
+  --surface:          #ffffff;
+  --surface-2:        #fafbfc;
+  --surface-3:        #f0f2f5;
+  --on-surface:       #171b23;
+  --on-surface-mid:   #5b636f;
+  --on-surface-low:   #8b929d;
+  --outline:          #e4e7ec;
+  --outline-strong:   #d4d8e0;
+
+  /* 语义色 */
+  --ok:               #1f7a4d;
+  --ok-weak:          #e8f5ee;
+  --warn:             #9a6212;
+  --warn-weak:        #fdf3e3;
+  --err:              #b4271c;
+  --err-weak:         #fdecea;
+  --info:             #2f5a96;
+  --info-weak:        #eaf1fb;
+
+  /* 字体 */
+  --font: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "SF Mono", Consolas, monospace;
+
+  /* 字号阶梯（只允许这几档） */
+  --fs-12: 12px;  --fs-13: 13px;  --fs-14: 14px;
+  --fs-16: 16px;  --fs-20: 20px;  --fs-28: 28px;
+
+  /* 间距（4 的倍数） */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+
+  /* 圆角与轮廓 */
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 999px;
+  --ring: 0 0 0 3px color-mix(in oklab, var(--brand) 16%, transparent);
+
+  /* 阴影（只用三层） */
+  --e0: none;
+  --e1: 0 1px 2px rgba(18, 24, 38, .05);
+  --e2: 0 8px 24px rgba(18, 24, 38, .10);
+
+  /* 动效 */
+  --t-fast: 140ms cubic-bezier(.2,.8,.2,1);
+  --t-base: 220ms cubic-bezier(.2,.8,.2,1);
+}
+
+html[data-theme="dark"]{
+  --brand:            #e8eaef;
+  --brand-hover:      #f4f5f8;
+  --brand-press:      #d8dbe2;
+  --on-brand:         #14161a;
+  --brand-weak:       #24282e;
+  --brand-weak-ink:   #e8eaef;
+
+  --bg:               #101216;
+  --surface:          #171a1f;
+  --surface-2:        #1b1f25;
+  --surface-3:        #22262d;
+  --on-surface:       #e9ebf0;
+  --on-surface-mid:   #a6adba;
+  --on-surface-low:   #767e8b;
+  --outline:          #2a2f37;
+  --outline-strong:   #3a4048;
+
+  --ok: #57c98d; --ok-weak: #16301f;
+  --warn: #e0a952; --warn-weak: #2e2413;
+  --err: #ef7b6e; --err-weak: #33191a;
+  --info: #8db6ef; --info-weak: #18243a;
+
+  --e1: 0 1px 2px rgba(0, 0, 0, .5);
+  --e2: 0 10px 30px rgba(0, 0, 0, .55);
+  --ring: 0 0 0 3px color-mix(in oklab, var(--brand) 22%, transparent);
+}
+
+/* ---------- 基础 ---------- */
+*{ box-sizing: border-box; }
+html, body{ height: 100%; }
+body{
+  margin: 0;
+  background: var(--bg);
+  color: var(--on-surface);
+  font: var(--fs-14)/1.65 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+::selection{ background: color-mix(in oklab, var(--brand) 22%, transparent); }
+
+/* 滚动条统一 */
+*::-webkit-scrollbar{ width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb{
+  background: var(--outline-strong); border-radius: var(--r-pill);
+  border: 3px solid transparent; background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover{ background-clip: content-box; background-color: var(--on-surface-low); }
+*::-webkit-scrollbar-track{ background: transparent; }
+
+/* ---------- 顶栏 ---------- */
+header{
+  height: 56px; display: flex; align-items: center; gap: var(--sp-3);
+  padding: 0 var(--sp-5);
+  background: var(--surface);
+  border-bottom: 1px solid var(--outline);
+}
+header h1{ font-size: var(--fs-16); font-weight: 650; margin: 0; letter-spacing: .2px; }
+.spacer{ flex: 1; }
+
+/* ---------- 按钮 ---------- */
+button{
+  font: inherit; font-size: var(--fs-13);
+  color: var(--on-surface);
+  background: var(--surface);
+  border: 1px solid var(--outline-strong);
+  border-radius: var(--r-sm);
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+}
+button:hover{ background: var(--surface-3); }
+button:active{ transform: translateY(1px); }
+button:focus-visible{ outline: none; box-shadow: var(--ring); }
+button.primary, button.btn--primary{
+  background: var(--brand); border-color: var(--brand); color: var(--on-brand);
+}
+button.primary:hover{ background: var(--brand-hover); border-color: var(--brand-hover); }
+button.primary:active{ background: var(--brand-press); }
+button.danger{ color: var(--err); border-color: color-mix(in oklab, var(--err) 35%, var(--outline)); }
+button:disabled{ opacity: .5; cursor: not-allowed; }
+
+/* ---------- 表单 ---------- */
+label{ display: block; font-size: var(--fs-12); color: var(--on-surface-mid); margin: 0 0 var(--sp-1); }
+input, select, textarea{
+  font: inherit; font-size: var(--fs-13);
+  width: 100%;
+  color: var(--on-surface);
+  background: var(--surface);
+  border: 1px solid var(--outline-strong);
+  border-radius: var(--r-sm);
+  padding: 7px 10px;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+input:focus, select:focus, textarea:focus{
+  outline: none; border-color: var(--brand); box-shadow: var(--ring);
+}
+input::placeholder, textarea::placeholder{ color: var(--on-surface-low); }
+
+/* ---------- 卡片 ---------- */
+.card, .round, .sesswrap > .sess{
+  background: var(--surface);
+  border: 1px solid var(--outline);
+  border-radius: var(--r-md);
+  box-shadow: var(--e1);
+}
+
+/* ---------- 标签 / 徽章 ---------- */
+.chip, .tag, .badge, .role, .chbadge, .pill{
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  font-size: var(--fs-12); line-height: 1.6;
+  padding: 1px 8px; border-radius: var(--r-pill);
+  background: var(--surface-3); color: var(--on-surface-mid);
+}
+.role{ background: var(--brand-weak); color: var(--brand-weak-ink); }
+.chip.kill, .badge.err{ background: var(--err-weak); color: var(--err); }
+.chip.vote, .badge.ok{ background: var(--ok-weak); color: var(--ok); }
+.chip.check, .badge.info{ background: var(--info-weak); color: var(--info); }
+.chip.poison, .chip.badge, .badge.warn{ background: var(--warn-weak); color: var(--warn); }
+
+/* ---------- 分隔与提示 ---------- */
+hr{ border: 0; border-top: 1px solid var(--outline); margin: var(--sp-4) 0; }
+.hint, .empty, .small{ font-size: var(--fs-12); color: var(--on-surface-low); }
+.ok{ color: var(--ok); } .warn{ color: var(--warn); } .err{ color: var(--err); }
+.mono{ font-family: var(--font-mono); font-size: var(--fs-12); }
+
+/* ---------- 开关 / 圆点 ---------- */
+.dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--outline-strong); flex: none; }
+.dot.on{ background: var(--ok); }
+
+/* ---------- 表格 ---------- */
+table{ width: 100%; border-collapse: collapse; font-size: var(--fs-13); }
+th, td{ text-align: left; padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--outline); }
+th{ font-size: var(--fs-12); color: var(--on-surface-mid); font-weight: 600; }
+
+/* ---------- 主题切换按钮（预留） ---------- */
+.theme-toggle{
+  width: 34px; height: 34px; padding: 0; border-radius: var(--r-pill);
+  display: inline-flex; align-items: center; justify-content: center;
+}

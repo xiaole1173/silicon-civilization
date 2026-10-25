@@ -4,17 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>情境仿真观察台</title>
+<link rel="stylesheet" href="theme.css">
+<script src="theme.js" defer></script>
 <style>
   :root{
-    --bg:#f5f6f8; --panel:#fff; --line:#e2e6eb; --ink:#1f2430; --muted:#6b7280;
+    --bg:var(--bg); --panel:var(--surface); --line:#e2e6eb; --ink:#1f2430; --muted:var(--on-surface-mid);
     --wolf:#b3261e; --wolf-bg:#fbeae8;
     --god:#6d28d9; --god-bg:#f1eafe;
-    --vill:#1e7e45; --vill-bg:#e7f4ec;
+    --vill:var(--ok); --vill-bg:#e7f4ec;
     --night:#1e3a8a; --night-bg:#e8eefc;
     --day:#b45309; --day-bg:#fdf2e3;
     --priv:#0e7490; --priv-bg:#e1f2f6;
     --warn:#b45309; --warn-bg:#fdf1e0;
-    --err:#c0392b; --err-bg:#fdecea;
+    --err:var(--err); --err-bg:var(--err-weak);
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
@@ -23,17 +25,17 @@
     padding:9px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   header h1{font-size:15px;margin:0;font-weight:650;white-space:nowrap;}
   .chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);
-    border-radius:999px;padding:2px 10px;white-space:nowrap;}
+    border-radius:var(--r-pill);padding:2px 10px;white-space:nowrap;}
   .chip b{color:var(--ink);font-weight:600;}
   .spacer{flex:1}
-  select,button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:#fff;
+  select,button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--surface);
     border-radius:8px;padding:5px 9px;cursor:pointer;color:var(--ink);}
   button:hover{background:#f0f2f5;}
   select{max-width:280px}
   .toggle{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;}
   main{display:grid;grid-template-columns:246px minmax(0,1fr) 320px;gap:12px;padding:12px;
     align-items:start;}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:12px;}
   .card h2{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 9px;letter-spacing:.03em;}
   /* 座位 */
   #seats{position:sticky;top:60px;max-height:calc(100vh - 76px);overflow:auto;}
@@ -54,10 +56,10 @@
   .seat .sub{font-size:11.5px;color:#9aa1ab;margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;}
   .dead-tag{color:var(--err);font-weight:600;}
   /* 事件流 */
-  .daygroup{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden;
+  .daygroup{border:1px solid var(--line);border-radius:var(--r-md);margin-bottom:12px;overflow:hidden;
     background:var(--panel);}
   .dayhead{display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid var(--line);
-    background:#fafbfc;font-size:12.5px;}
+    background:var(--surface-2);font-size:12.5px;}
   .dayhead .dtitle{font-weight:650;}
   .badge{font-size:11px;border-radius:6px;padding:1px 7px;font-weight:600;white-space:nowrap;}
   .badge.night{color:var(--night);background:var(--night-bg);}
@@ -77,11 +79,11 @@
   .act.poison{color:#7c2d12;background:#fbe9e1;}
   .act.vote{color:#334155;background:#eef2f7;}
   .act.pass{color:var(--muted);background:#eef0f2;}
-  .act.wolfchat{color:var(--wolf);background:#fdecea;}
+  .act.wolfchat{color:var(--wolf);background:var(--err-weak);}
   .wolfline{background:#fdf6f5;border:1px solid #f3d6d2;border-radius:8px;padding:6px 9px;}
   .wolflabel{font-size:11.5px;color:var(--wolf);font-weight:600;margin-top:2px;}
   .txt{flex:1;min-width:0;}
-  .speech{background:#fafbfc;border:1px solid #eef1f4;border-radius:8px;padding:6px 9px;}
+  .speech{background:var(--surface-2);border:1px solid #eef1f4;border-radius:8px;padding:6px 9px;}
   .think{margin-top:5px;}
   .think summary{cursor:pointer;list-style:none;font-size:11.5px;color:#8b93a1;}
   .think summary::before{content:"思考 ";font-weight:600;}
@@ -94,13 +96,13 @@
   .resolve b{color:var(--ink);}
   .votegrid{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0;}
   .v{font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#475569;
-    font-variant-numeric:tabular-nums;background:#fff;}
+    font-variant-numeric:tabular-nums;background:var(--surface);}
   .v.abst{color:#9aa1ab}
   .endbanner{margin:10px 0;padding:10px 14px;border-radius:10px;font-weight:650;
     background:var(--night-bg);color:var(--night);border:1px solid #c9d8f7;}
   .empty{color:#9aa1ab;font-size:13px;padding:14px 4px;}
   .livebox{position:sticky;top:58px;z-index:8;background:#fffdf7;border:1px solid #f0dfb8;
-    border-radius:12px;padding:9px 12px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+    border-radius:var(--r-md);padding:9px 12px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
   .lv-head{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);}
   .lv-who{font-weight:650;color:var(--ink);}
   .lv-status{margin-left:auto;color:var(--warn);font-weight:600;}
@@ -111,7 +113,7 @@
     padding:5px 8px;max-height:120px;overflow:auto;white-space:pre-wrap;border-radius:0 6px 6px 0;
     display:none;}
   .spk{margin-left:8px;font-size:11.5px;padding:1px 7px;border-radius:6px;
-    border:1px solid #dfe5ee;background:#fff;color:#55606f;cursor:pointer;vertical-align:1px;}
+    border:1px solid #dfe5ee;background:var(--surface);color:#55606f;cursor:pointer;vertical-align:1px;}
   .spk:hover{background:#f2f6fb;color:#1f2430;}
   .spk.playing{background:#e8f2ff;border-color:#a9c6f6;color:#1d4ed8;}
   .caret{display:inline-block;width:7px;height:13px;background:#c9a227;margin-left:2px;

@@ -4,15 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Silicon Civilization · 社会仿真回放台 v0</title>
+<link rel="stylesheet" href="../web/theme.css">
+<script src="../web/theme.js" defer></script>
 <style>
   :root{
-    --bg:#f5f6f8; --panel:#ffffff; --line:#e2e6eb; --ink:#1f2430; --muted:#6b7280;
-    --take:#c0392b; --take-bg:#fdecea;
-    --give:#1e7e45; --give-bg:#e7f4ec;
+    --bg:var(--bg); --panel:var(--surface); --line:#e2e6eb; --ink:#1f2430; --muted:var(--on-surface-mid);
+    --take:var(--err); --take-bg:var(--err-weak);
+    --give:var(--ok); --give-bg:#e7f4ec;
     --prop:#1d4ed8; --prop-bg:#e8effd;
     --ok:#0e7490;   --ok-bg:#e1f2f6;
     --no:#b45309;   --no-bg:#fdf1e0;
-    --pass:#6b7280; --pass-bg:#eef0f2;
+    --pass:var(--on-surface-mid); --pass-bg:#eef0f2;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
@@ -21,15 +23,15 @@
     padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
   header h1{font-size:15px;margin:0;font-weight:650;white-space:nowrap;}
   .chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);
-    border-radius:999px;padding:2px 10px;white-space:nowrap;}
+    border-radius:var(--r-pill);padding:2px 10px;white-space:nowrap;}
   .chip b{color:var(--ink);font-weight:600;}
   .spacer{flex:1;}
-  button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:8px;
+  button{font:inherit;border:1px solid var(--line);background:var(--surface);border-radius:8px;
     padding:5px 12px;cursor:pointer;}
   button:hover{background:#f0f2f5;}
-  select{font:inherit;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:#fff;}
+  select{font:inherit;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:var(--surface);}
   main{display:grid;grid-template-columns:236px 1fr 308px;gap:12px;padding:12px;height:calc(100vh - 53px);}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:12px;}
   h2{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 8px;letter-spacing:.04em;}
   #agents{overflow:auto;}
   .agent{padding:8px 0;border-bottom:1px dashed var(--line);}
@@ -41,7 +43,7 @@
   .bar i{display:block;height:100%;background:#5b8def;border-radius:4px;transition:width .4s;}
   #feedCard{display:flex;flex-direction:column;overflow:hidden;}
   #feed{flex:1;overflow:auto;padding-right:4px;}
-  .round{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fff;}
+  .round{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:var(--surface);}
   .round-h{font-size:12px;color:var(--muted);margin-bottom:8px;display:flex;gap:10px;}
   .round-h b{color:var(--ink);font-size:13px;}
   .slots{display:flex;flex-direction:column;gap:6px;}
