@@ -144,11 +144,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True, "plugins": plugin_mod.list_plugins()})
         if path == "/api/sessions":
             return self._json(200, {"ok": True, "sessions": runner_mod.list_sessions()})
+        if path == "/api/replay":
+            return self._json(200, {"ok": True, "logs": self._list_session_logs()})
         parts = [p for p in path.split("/") if p]
         if len(parts) >= 3 and parts[1] == "sessions":
             sid = parts[2]
             if len(parts) == 4 and parts[3] == "stream":
                 return self._stream_session(sid)
+            if len(parts) == 4 and parts[3] == "log":
+                return self._session_log(sid)
             sess = runner_mod.get_session(sid)
             if not sess:
                 return self._error(404, "会话不存在")
@@ -298,6 +302,36 @@ class Handler(BaseHTTPRequestHandler):
         return self._error(404, "未知接口")
 
     # ---------- 基座：会话 ----------
+    def _list_session_logs(self):
+        base = ROOT / "runs" / "sessions"
+        items = []
+        if base.is_dir():
+            files = sorted(base.glob("*.jsonl"), key=lambda x: x.stat().st_mtime, reverse=True)
+            for p in files[:80]:
+                st = p.stat()
+                items.append({"id": p.stem, "size": st.st_size, "mtime": int(st.st_mtime)})
+        return items
+
+    def _session_log(self, sid):
+        """从 JSONL 日志重放：会话重启后依然可回看。"""
+        path = ROOT / "runs" / "sessions" / (sid + ".jsonl")
+        if not path.exists():
+            return self._error(404, "没有这局的日志")
+        events = []
+        with path.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except Exception:
+                    continue
+                if ev.get("type") == "delta":   # 增量可由 message_end 还原，跳过以减小体积
+                    continue
+                events.append(ev)
+        return self._json(200, {"ok": True, "events": events, "id": sid})
+
     def _create_session(self):
         body = self._body()
         plugin = plugin_mod.get_plugin(str(body.get("plugin") or ""))

@@ -76,6 +76,8 @@
     margin:16px 0;overflow:hidden}
   .round-head{display:flex;align-items:center;gap:9px;padding:8px 13px;
     background:var(--surface-2);border-bottom:1px solid var(--line)}
+  .round-head .rt,.round-head .rs,.round-head .chbadge{white-space:nowrap}
+  .round-head .rx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%}
   .round-head .rt{font-size:13px;font-weight:650}
   .round-head .rs{font-size:11.5px;color:var(--muted)}
   .round-head .rx{margin-left:auto;font-size:11.5px;color:var(--brand);font-variant-numeric:tabular-nums}
@@ -178,6 +180,8 @@
   <aside id="left">
     <h2>会话</h2>
     <div id="sessList"><div class="hint">还没有会话</div></div>
+    <h2 style="margin-top:16px">历史回放</h2>
+    <div id="replayList"><div class="hint">—</div></div>
   </aside>
   <section id="chat">
     <div id="stream"><div class="hint" style="padding:20px 0">新建一个会话，或从左侧选择。</div></div>
@@ -390,7 +394,7 @@ function addMessage(m){
 
 function finalize(node, text, thinking, meta){
   if (!node) return;
-  var isVote = node.root && node.root.className === "vchip";
+  var isVote = !!(node.root && node.root.classList && node.root.classList.contains("vchip"));
   if (isVote){
     // 思考只记一次（patch_message 会重复发 message_end）
     if (thinking && thinking.trim() && !node.thinkDone && node.round && node.round.vthink){
@@ -467,12 +471,25 @@ function updateMetrics(){
     if (!u) return;
     pin += u.prompt_tokens || 0; pout += u.completion_tokens || 0;
   });
-  $("metrics").innerHTML =
-    '<div class="kv"><span>回合</span><b>' + Object.keys(S.rounds).length + '</b></div>' +
-    '<div class="kv"><span>消息</span><b>' + n + '</b></div>' +
-    '<div class="kv"><span>参与者</span><b>' + Object.keys(S.agents).length + '</b></div>' +
-    '<div class="kv"><span>输入 tok</span><b>' + pin + '</b></div>' +
-    '<div class="kv"><span>输出 tok</span><b>' + pout + '</b></div>';
+  var rows = [
+    ["回合", Object.keys(S.rounds).length],
+    ["消息", n],
+    ["参与者", Object.keys(S.agents).length],
+    ["输入 tok", pin],
+    ["输出 tok", pout]
+  ];
+  var m = S.sessionMetrics || {};
+  Object.keys(m).slice(0, 6).forEach(function(k){
+    var v = m[k];
+    rows.push([k.replace(/^m_/, ""), (typeof v === "number" ? v : String(v))]);
+  });
+  if (S.reputation && Object.keys(S.reputation).length){
+    rows.push(["声誉", Object.keys(S.reputation).map(function(k){
+      return k + ":" + S.reputation[k]; }).join(" ")]);
+  }
+  $("metrics").innerHTML = rows.map(function(r){
+    return '<div class="kv"><span>' + esc(r[0]) + '</span><b>' + esc(r[1]) + '</b></div>';
+  }).join("");
 }
 
 /* ---------- 事件 ---------- */
@@ -481,6 +498,8 @@ function handleEvent(e){
     $("pluginName").textContent = e.scenario || "—";
     (e.agents || []).forEach(function(a){ S.agents[a.id] = a; });
     S.alive = e.alive || null; S.sheriff = e.sheriff; S.revealed = e.revealed || [];
+    S.sessionMetrics = e.metrics || {};
+    S.reputation = e.reputation || {};
     (e.rounds || []).forEach(function(r){ S.roundMeta[r.id] = r; });
     renderMembers(); setState(e.state, e.winner);
     return;
@@ -534,17 +553,19 @@ function handleEvent(e){
       if (who) who.insertAdjacentHTML("afterend", '<span class="role">' + esc(e.meta.role) + '</span>');
     }
     if (e.meta && e.meta.usage) node.usage = e.meta.usage;
-    if (e.meta && e.meta.ok === false){
+    if (e.meta && e.meta.ok === false && !node.failShown){
       var f = document.createElement("div");
       f.className = "fail";
       f.textContent = "调用失败：" + (e.meta.error || "未知错误");
       node.body.appendChild(f);
+      node.failShown = true;
     }
-    if (e.meta && e.meta.rejections && e.meta.rejections.length){
+    if (e.meta && e.meta.rejections && e.meta.rejections.length && !node.errShown){
       var err = document.createElement("div");
       err.className = "errline";
       err.textContent = "校验重说 " + e.meta.rejections.length + " 次：" + e.meta.rejections[0];
       node.body.appendChild(err);
+      node.errShown = true;
     }
     updateMetrics(); scrollBottom(); return;
   }
@@ -571,7 +592,7 @@ function attach(sid){
   S.cur = sid; S.msgs = {}; S.rounds = {}; S.roundMeta = {}; S.agents = {}; S.retry = 0; S.stick = true;
   $("stream").innerHTML = ""; banner(""); loadSessions();
   api("/api/sessions/" + encodeURIComponent(sid)).then(function(d){
-    if (!d.ok){ banner("这个会话已经不在了（服务重启过，内存会话会丢失）。"); return; }
+    if (!d.ok){ replayLog(sid); return; }
     var es = new EventSource("/api/sessions/" + encodeURIComponent(sid) + "/stream");
     S.es = es;
     es.onmessage = function(ev){
@@ -583,6 +604,48 @@ function attach(sid){
       banner(S.retry >= 4 ? "连接中断：服务可能已重启，这一局已失效。"
                           : "连接中断，正在重连（第 " + S.retry + " 次）…");
     };
+  });
+}
+
+function replayLog(sid){
+  banner("会话已不在内存中，正在从日志回放…");
+  api("/api/sessions/" + encodeURIComponent(sid) + "/log").then(function(d){
+    if (!d.ok){ banner("没有找到这一局的日志。"); return; }
+    banner("历史回放 · " + sid + "（只读，非实时）");
+    var skip = { delta: 1, turn: 1, ping: 1 };
+    // 老日志没有 meta 事件：用消息里的 sender 反推参与者
+    (d.events || []).forEach(function(ev){
+      if (ev.type !== "message_start") return;
+      var m = ev.message || {};
+      if (m.sender == null || S.agents[m.sender]) return;
+      var meta = m.meta || {};
+      S.agents[m.sender] = {id: m.sender, name: m.sender_name || (m.sender + " 号"),
+                            model: meta.model || "", role: meta.role || ""};
+    });
+    (d.events || []).forEach(function(ev){
+      if (skip[ev.type]) return;
+      if (ev.type === "meta"){
+        $("pluginName").textContent = ev.scenario || "—";
+        (ev.agents || []).forEach(function(a){ S.agents[a.id] = a; });
+        renderMembers();
+        return;
+      }
+      handleEvent(ev);
+    });
+    updateMetrics();
+    S.stick = true; scrollBottom(true);
+  });
+}
+
+function loadReplay(){
+  return api("/api/replay").then(function(d){
+    var logs = (d.logs || []).slice(0, 12);
+    $("replayList").innerHTML = logs.length ? logs.map(function(l){
+      var kb = Math.max(1, Math.round((l.size || 0) / 1024));
+      return '<button class="sess" data-log="' + esc(l.id) + '">' +
+        '<div class="t">' + esc(l.id) + '</div>' +
+        '<div class="s">' + kb + ' KB · 日志回放</div></button>';
+    }).join("") : '<div class="hint">暂无日志</div>';
   });
 }
 
@@ -719,6 +782,15 @@ $("pluginSel").onchange = renderConfig;
 $("btnAddSeat").onclick = function(){
   renderSeats(document.querySelectorAll("#seats .mdl").length + 1);
 };
+$("replayList").onclick = function(ev){
+  var t = ev.target.closest ? ev.target.closest("[data-log]") : null;
+  if (!t) return;
+  var id = t.getAttribute("data-log");
+  S.cur = id; S.msgs = {}; S.rounds = {}; S.roundMeta = {}; S.agents = {};
+  $("stream").innerHTML = "";
+  replayLog(id);
+  loadSessions();
+};
 $("sessList").onclick = function(ev){
   var stop = ev.target.closest ? ev.target.closest("[data-stop]") : null;
   if (stop){
@@ -731,7 +803,7 @@ $("sessList").onclick = function(ev){
   var t = ev.target.closest ? ev.target.closest("[data-id]") : null;
   if (t) attach(t.getAttribute("data-id"));
 };
-loadPlugins().then(loadModels).then(loadSessions).then(function(){
+loadPlugins().then(loadModels).then(loadSessions).then(loadReplay).then(function(){
   var q = new URLSearchParams(location.search);
   var want = q.get("session");
   if (want){ q.has("static") ? attachStatic(want) : attach(want); }

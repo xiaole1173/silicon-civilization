@@ -274,6 +274,18 @@ class Session:
             return {}
         return {str(k): v for k, v in sorted(self.reputation.items())}
 
+    def publish_meta(self) -> None:
+        """把标题/参与者/身份写入日志，供"会话重启后从日志回放"使用。"""
+        self._publish({
+            "type": "meta", "id": self.id, "title": self.title,
+            "scenario": getattr(self.scenario, "id", ""),
+            "config": self.config,
+            "agents": [{"id": a.id, "name": a.name,
+                        "model": a.model_conf.get("model", ""),
+                        "role": (self.meta.get("agent_roles") or {}).get(a.id, "")}
+                       for a in self.agents.values()],
+        })
+
     def publish_state(self) -> None:
         """把存活/警长等对局状态推给观察者（模型看不到，只用于界面）。"""
         self._publish({"type": "state", "alive": self.alive_ids(),
@@ -313,5 +325,8 @@ class Session:
             "revealed": self.meta.get("revealed") or [],
             "messages": [m.to_dict() for m in self.messages],
             "rounds": self.rounds,
+            "metrics": self.meta.get("metrics") or {},
+            "outcome": self.meta.get("outcome") or {},
+            "reputation": self.reputation_snapshot(),
             "config": self.config,
         }

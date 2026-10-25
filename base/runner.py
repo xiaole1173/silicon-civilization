@@ -23,6 +23,10 @@ def create_session(session_id: str, plugin, config: dict, seats: list, title: st
         session.agents[idx] = agent
     with _LOCK:
         _SESSIONS[session_id] = session
+    try:
+        session.publish_meta()
+    except Exception:
+        pass
     return session
 
 
