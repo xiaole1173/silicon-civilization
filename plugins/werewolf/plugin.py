@@ -482,10 +482,11 @@ class WerewolfPlugin(BaseScenario):
 
     def _handle_badge(self, session, seat: int) -> None:
         st = self._state(session)
-        st.sheriff = None
         rnd = session.open_round("警徽移交", "{} 号出局".format(seat), kind="vote")
+        # 注意：先问再清空——校验依赖 state.sheriff == seat
         action = self._act(session, seat, "badge", "你是警长，已出局，可以把警徽交给一个活人。",
                            round_id=rnd["id"])
+        st.sheriff = None
         target = self._as_target(action) if action.get("kind") == "pass_badge" else None
         if target is not None and target in st.alive and target != seat:
             st.sheriff = target
