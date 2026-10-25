@@ -49,3 +49,8 @@ _pc/
 _pc2/
 github_homepage/
 docs/homepage-*.png
+
+# 浏览器/截图临时目录（绝不入库）
+_pw*/
+_pwt*/
+_pwZ*/
