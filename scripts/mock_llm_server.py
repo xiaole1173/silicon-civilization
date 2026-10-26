@@ -29,7 +29,7 @@ def parse_ctx(user_text: str) -> dict:
     return {"seat": seat, "alive": alive, "text": user_text}
 
 
-def choose(user_text: str):
+def choose(user_text: str, system_text: str = ""):
     ctx = parse_ctx(user_text)
     seat, alive = ctx["seat"], ctx["alive"]
     others = [s for s in alive if s != seat]
@@ -59,6 +59,22 @@ def choose(user_text: str):
     if "【日间·表决】" in user_text:
         return ({"kind": "vote", "target": first, "reason": "压力位"},
                 "把票集中在 {} 号身上，逼他表态。".format(first))
+    # 公地困境：按座位给不同贪心度，制造分布差异
+    if "【公地·声明】" in user_text or "【公地·取用】" in user_text:
+        seat = 0
+        m_seat = re.search(r"座位 (\d+)", user_text)
+        if m_seat:
+            seat = int(m_seat.group(1))
+        else:
+            m_seat = re.search(r"座位 (\d+)", system_text or "")
+            if m_seat:
+                seat = int(m_seat.group(1))
+        greedy = (seat % 3 == 0)          # 每 3 个座位一个贪心户
+        amount = 22 if greedy else 6
+        kind = "declare" if "【公地·声明】" in user_text else "take"
+        return ({"kind": kind, "amount": amount},
+                "得看还剩多少，但我要多拿一点。" if greedy else "按可持续份额来。")
+
     if "【日间·警长竞选】" in user_text:
         return ({"kind": "vote", "target": alive[0] if alive else 1}, "选个看起来可信的。")
     if "【日间·自爆声明】" in user_text:
@@ -145,11 +161,16 @@ class Handler(BaseHTTPRequestHandler):
             body = {}
         messages = body.get("messages") or body.get("input") or []
         user_text = ""
+        system_text = ""
         for msg in reversed(messages if isinstance(messages, list) else []):
-            if isinstance(msg, dict) and msg.get("role") == "user":
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("role")
+            if role == "system" and not system_text:
+                system_text = str(msg.get("content") or "")
+            elif role == "user" and not user_text:
                 user_text = str(msg.get("content") or "")
-                break
-        action, thinking = choose(user_text)
+        action, thinking = choose(user_text, system_text)
         content = action.get("_plain") if isinstance(action.get("_plain"), str) \
             else json.dumps(action, ensure_ascii=False)
         time.sleep(0.05)

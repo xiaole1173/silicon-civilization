@@ -31,6 +31,8 @@ CONTEXT_TAG = {
     "wolf_destruct": "【日间·自爆声明】",
     "wolf_king": "【出局·狼王反制】",
     "badge": "【出局·警徽移交】",
+    "commons_declare": "【公地·声明】",
+    "commons_take": "【公地·取用】",
 }
 
 CONTEXT_HINT = {
@@ -50,6 +52,8 @@ CONTEXT_HINT = {
     "wolf_destruct": "白天你可以选择自爆：立刻出局，但直接进入黑夜，当天不投票。",
     "wolf_king": "你是狼王/白狼王：出局时可以开枪带走一人（被毒杀不能）。",
     "badge": "你是警长且已出局：可以把警徽交给一个活着的人，也可以让它作废。",
+    "commons_declare": "当众说明你这轮打算取用多少——所有人都会听到，但没人强制你守信。",
+    "commons_take": "现在真正取用。想清楚：草场归零，所有人都输。",
 }
 
 LEGAL = {
@@ -69,6 +73,8 @@ LEGAL = {
     "wolf_destruct": ["destruct", "pass"],
     "wolf_king": ["shoot", "pass"],
     "badge": ["pass_badge", "destroy"],
+    "commons_declare": ["declare", "pass"],
+    "commons_take": ["take"],
 }
 
 SCHEMA_TEXT = {
@@ -88,6 +94,8 @@ SCHEMA_TEXT = {
     "wolf_destruct": '{"kind": "destruct"} 或 {"kind": "pass"}',
     "wolf_king": '{"kind": "shoot", "target": 座位号} 或 {"kind": "pass"}',
     "badge": '{"kind": "pass_badge", "target": 座位号} 或 {"kind": "destroy"}',
+    "commons_declare": '{"kind": "declare", "amount": 数字}',
+    "commons_take": '{"kind": "take", "amount": 数字}',
 }
 
 SYSTEM = (

@@ -56,6 +56,12 @@
   .kv b{color:var(--on-surface);font-variant-numeric:tabular-nums}
   .empty{font-size:var(--fs-12);color:var(--on-surface-low);padding:var(--sp-4) 0}
   .fail{font-size:11px;color:var(--err)}
+  .spark{width:100%;height:auto;display:block}
+  .spark .line{fill:none;stroke:var(--brand);stroke-width:2}
+  .spark .area{fill:color-mix(in oklab, var(--brand) 12%, transparent)}
+  .spark .warn{stroke:var(--err);stroke-dasharray:4 3;stroke-width:1;fill:none}
+  .spark .grid{stroke:var(--outline);stroke-width:1}
+  .spark text{font-size:9px;fill:var(--on-surface-low)}
 </style>
 </head>
 <body>
@@ -81,6 +87,8 @@
   <aside id="right">
     <h2>指标</h2>
     <div id="metrics"><div class="kv"><span>进度</span><b>0 / 0</b></div></div>
+    <h2 style="margin-top:16px">资源池</h2>
+    <div id="world"><div class="empty">本局没有资源数据</div></div>
     <h2 style="margin-top:16px">说明</h2>
     <div class="empty" style="padding-top:0">
       数据来自 runs/sessions/*.jsonl，只读回放。每张卡是一个回合，右侧是结论；动作以彩色标签显示。
@@ -121,7 +129,12 @@ function loadLogs(){
       return '<option value="' + esc(l.id) + '">' + esc(l.id) + " · " + kb + " KB</option>";
     }).join("");
     // 默认选内容最丰富的一局（小文件多为单元测试日志，没有回合）
-    var pick = S.logs.filter(function(l){ return l.size > 20000; })[0] || S.logs[0];
+    var want = (location.search.match(/[?&]log=([^&]+)/) || [])[1];
+    var pick = null;
+    if (want){
+      pick = S.logs.filter(function(l){ return l.id === want; })[0];
+    }
+    if (!pick) pick = S.logs.filter(function(l){ return l.size > 20000; })[0] || S.logs[0];
     if (pick){
       sel.value = pick.id;
       loadViz(pick.id);
@@ -172,6 +185,7 @@ function render(){
       '</div>' + (items || '<div class="empty">（无动作）</div>') + "</div>";
   }).join("") || '<div class="empty">还没有回合</div>';
 
+  renderWorld(d);
   var m = d.metrics || {};
   $("metrics").innerHTML =
     '<div class="kv"><span>进度</span><b>' + S.step + " / " + (d.rounds || []).length + '</b></div>' +
@@ -180,6 +194,35 @@ function render(){
     '<div class="kv"><span>参与者</span><b>' + (m.agents || 0) + '</b></div>' +
     ((d.final && d.final.winner) ? '<div class="kv"><span>胜方</span><b>' +
       esc(d.final.winner) + '</b></div>' : "");
+}
+
+function renderWorld(d){
+  var box = $("world");
+  var w = (d.world || []).filter(function(p){ return p.stock != null; });
+  if (!w.length){ box.innerHTML = '<div class="empty">本局没有资源数据</div>'; return; }
+  var cap = w[0].cap || Math.max.apply(null, w.map(function(p){ return p.stock; })) || 1;
+  var W = 240, H = 96, pad = 6;
+  var n = w.length;
+  var pts = w.map(function(p, i){
+    var x = pad + (W - 2 * pad) * (n === 1 ? 0.5 : i / (n - 1));
+    var y = H - pad - (H - 2 * pad) * Math.max(0, Math.min(1, p.stock / cap));
+    return [x, y];
+  });
+  var dline = pts.map(function(p, i){ return (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+  var darea = dline + " L" + pts[pts.length - 1][0].toFixed(1) + "," + (H - pad) +
+              " L" + pts[0][0].toFixed(1) + "," + (H - pad) + " Z";
+  var warnY = H - pad - (H - 2 * pad) * 0.1;
+  var last = w[w.length - 1];
+  box.innerHTML =
+    '<svg class="spark" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none">' +
+    '<line class="grid" x1="' + pad + '" y1="' + warnY + '" x2="' + (W - pad) + '" y2="' + warnY + '"/>' +
+    '<path class="area" d="' + darea + '"/>' +
+    '<path class="line" d="' + dline + '"/>' +
+    '<text x="' + pad + '" y="' + (warnY - 2) + '">10% 警戒线</text>' +
+    "</svg>" +
+    '<div class="kv"><span>当前存量</span><b>' + esc(last.stock) + " / " + esc(cap) + "</b></div>" +
+    '<div class="kv"><span>稀缺度</span><b>' + Math.round((last.scarcity || 0) * 100) + "%</b></div>" +
+    '<div class="kv"><span>采样点</span><b>' + n + "</b></div>";
 }
 
 function stop(){ if (S.timer){ clearInterval(S.timer); S.timer = null; } $("play").textContent = "播放"; }

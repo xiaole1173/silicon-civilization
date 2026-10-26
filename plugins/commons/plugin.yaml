@@ -1,0 +1,9 @@
+id: commons
+name: 公地困境
+description: 共享草场：公开声明 → 取用 → 结算；用 regen_rate 控制稀缺度，测合作与信任。
+default_config:
+  scenario: scenarios/commons.yaml
+  rounds: 8
+  regen_rate: 0.05
+  per_round_max: 25
+  declare: true

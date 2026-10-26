@@ -274,6 +274,12 @@ class Session:
             return {}
         return {str(k): v for k, v in sorted(self.reputation.items())}
 
+    def publish_world(self, payload: dict) -> None:
+        """把世界状态（资源存量为代表）推给观察者，并落进日志供回放。"""
+        event = {"type": "world"}
+        event.update(payload or {})
+        self._publish(event)
+
     def publish_meta(self) -> None:
         """把标题/参与者/身份写入日志，供"会话重启后从日志回放"使用。"""
         self._publish({

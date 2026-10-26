@@ -320,6 +320,7 @@ class Handler(BaseHTTPRequestHandler):
         if not path.exists():
             return self._error(404, "没有这局的日志")
         agents, rounds, order = {}, [], []
+        world_series = []
         round_by_id = {}
         state_seq = []
         final = {}
@@ -395,6 +396,11 @@ class Handler(BaseHTTPRequestHandler):
                                     it["latency_ms"] = meta["latency_ms"]
                                 it["failed"] = meta.get("ok") is False
                                 break
+                elif t == "world":
+                    world_series.append({"round": ev.get("round", 0),
+                                         "stock": ev.get("stock"),
+                                         "cap": ev.get("cap"),
+                                         "scarcity": ev.get("scarcity")})
                 elif t == "state":
                     state_seq.append({"alive": ev.get("alive") or [],
                                       "sheriff": ev.get("sheriff")})
@@ -407,6 +413,7 @@ class Handler(BaseHTTPRequestHandler):
             "rounds": rounds,
             "states": state_seq,
             "final": final,
+            "world": world_series,
             "metrics": {"rounds": len(rounds), "actions": total_items,
                         "agents": len(agents)},
         })
