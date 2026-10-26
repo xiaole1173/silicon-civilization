@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "server"))
 
-import base.metrics as metrics_mod  # noqa: E402
+import base.report as report_mod     # noqa: E402
 
 BEGIN = "<!-- RESULTS:BEGIN -->"
 END = "<!-- RESULTS:END -->"
@@ -34,9 +34,11 @@ def latest_batch(root: str) -> str:
     base = os.path.join(root, "runs", "experiments")
     if not os.path.isdir(base):
         raise SystemExit("没有 runs/experiments 目录")
-    dirs = [d for d in os.listdir(base) if os.path.isdir(os.path.join(base, d))]
+    dirs = [d for d in os.listdir(base)
+            if os.path.isdir(os.path.join(base, d))
+            and os.path.exists(os.path.join(base, d, "index.csv"))]
     if not dirs:
-        raise SystemExit("实验目录为空")
+        raise SystemExit("实验目录里还没有任何 index.csv")
     dirs.sort(key=lambda d: os.path.getmtime(os.path.join(base, d)), reverse=True)
     return dirs[0]
 
@@ -96,7 +98,7 @@ def build_section(rows, batch_id: str, has_chart: bool) -> str:
     # 一句话结论
     comps = []
     for key, label in MAIN_METRICS[:1]:
-        comps = metrics_mod.compare(rows, [key])
+        comps = report_mod.compare(rows, [key])
     if len(comps) >= 2:
         best = max(comps, key=lambda c: (c["agg"].get("m_cooperation_rate") or {}).get("mean") or -1)
         worst = min(comps, key=lambda c: (c["agg"].get("m_cooperation_rate") or {}).get("mean") or 9)
