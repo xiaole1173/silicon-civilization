@@ -35,6 +35,7 @@ CONTEXT_TAG = {
     "commons_take": "【公地·取用】",
     "commons_propose": "【公地·议约】",
     "commons_accept": "【公地·附议】",
+    "horror_speak": "【条例·发言】",
 }
 
 CONTEXT_HINT = {
@@ -58,6 +59,7 @@ CONTEXT_HINT = {
     "commons_take": "现在真正取用。想清楚：草场归零，所有人都输。",
     "commons_propose": "你可以提议一个本轮全员取用上限；没人接受就作废。",
     "commons_accept": "是否接受这个上限？接受后你若超额，会被记为违约。",
+    "horror_speak": "按条例说一句；不确定可以请管理员解释（每轮一次）。",
 }
 
 LEGAL = {
@@ -81,6 +83,7 @@ LEGAL = {
     "commons_take": ["take"],
     "commons_propose": ["propose", "pass"],
     "commons_accept": ["accept", "pass"],
+    "horror_speak": ["speak", "ask_rule", "pass"],
 }
 
 SCHEMA_TEXT = {

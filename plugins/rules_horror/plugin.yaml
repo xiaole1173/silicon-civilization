@@ -1,0 +1,7 @@
+id: rules_horror
+name: 规则怪谈
+description: 夜班条例：条文可被程序检查，测规则理解、违规与求助行为。
+default_config:
+  scenario: scenarios/rules_horror.yaml
+  rounds: 5
+  max_violations: 3

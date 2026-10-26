@@ -1,0 +1,30 @@
+# 规则怪谈：条文可被程序确定性检查（禁词 / 字数上限 / 必须发言）
+name: 第七病区 · 夜班条例
+players: 6
+
+theme:
+  name: 第七病区
+  premise: |
+    你们六个人被留下值夜班。墙上贴着一张《夜班条例》，只有几条，字迹发灰。
+    条例说：违反了，会有人来带你走。没人告诉你们"他们"是谁。
+    你们可以照着条例说话；拿不准的地方，可以举手请管理员解释（每轮最多一次）。
+
+rules:
+  - id: R1
+    text: 不得说出"血"字。
+    check:
+      type: forbidden_words
+      words: ["血"]
+  - id: R2
+    text: 每轮发言不超过 40 字。
+    check:
+      type: max_chars
+      value: 40
+  - id: R3
+    text: 每轮必须发言，不能沉默。
+    check:
+      type: must_speak
+
+rounds: 5
+max_violations: 3       # 违规累计到几次就被带走
+ask_limit: 1            # 每轮最多请管理员解释几次

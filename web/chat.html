@@ -172,6 +172,7 @@
   <span class="pill">消息 <b id="msgCount">0</b></span>
   <span class="pill" id="statePill">未开始</span>
   <span class="spacer"></span>
+  <button id="ttsBtn" title="语音播报裁判与发言">播报：关</button>
   <button class="primary" id="btnNew">新建会话</button>
 </header>
 <div id="banner"></div>
@@ -493,6 +494,40 @@ function updateMetrics(){
 }
 
 /* ---------- 事件 ---------- */
+/* ---------- TTS 播报 ---------- */
+var TTS = { on: false, queue: [], playing: false };
+
+function ttsInit(){
+  try { TTS.on = localStorage.getItem("dsh-tts") === "1"; } catch (err) {}
+  var btn = $("ttsBtn");
+  if (btn) btn.textContent = "播报：" + (TTS.on ? "开" : "关");
+}
+
+function ttsSay(text){
+  if (!TTS.on || !text) return;
+  var t = String(text).replace(/\s+/g, " ").trim();
+  if (!t) return;
+  TTS.queue.push(t.slice(0, 120));
+  if (TTS.queue.length > 6) TTS.queue.shift();
+  ttsPump();
+}
+
+function ttsPump(){
+  if (TTS.playing || !TTS.queue.length) return;
+  TTS.playing = true;
+  var text = TTS.queue.shift();
+  fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ text: text }) })
+    .then(function(r){ return r.ok ? r.blob() : Promise.reject(); })
+    .then(function(blob){
+      var audio = new Audio(URL.createObjectURL(blob));
+      audio.onended = function(){ TTS.playing = false; ttsPump(); };
+      audio.onerror = function(){ TTS.playing = false; ttsPump(); };
+      audio.play().catch(function(){ TTS.playing = false; ttsPump(); });
+    })
+    .catch(function(){ TTS.playing = false; ttsPump(); });
+}
+
 function handleEvent(e){
   if (e.type === "snapshot"){
     $("pluginName").textContent = e.scenario || "—";
@@ -553,6 +588,13 @@ function handleEvent(e){
       if (who) who.insertAdjacentHTML("afterend", '<span class="role">' + esc(e.meta.role) + '</span>');
     }
     if (e.meta && e.meta.usage) node.usage = e.meta.usage;
+    if (e.text){
+      var who = "";
+      if (node.root && node.root.querySelector(".who")){
+        who = node.root.querySelector(".who").textContent;
+      }
+      ttsSay(e.text.indexOf("裁判") === 0 ? e.text : (who ? who + "：" + e.text : e.text));
+    }
     if (e.meta && e.meta.ok === false && !node.failShown){
       var f = document.createElement("div");
       f.className = "fail";
@@ -776,6 +818,12 @@ function startSession(){
 
 /* ---------- 绑定 ---------- */
 $("stream").addEventListener("scroll", function(){ S.stick = nearBottom(); });
+$("ttsBtn").onclick = function(){
+  TTS.on = !TTS.on;
+  try { localStorage.setItem("dsh-tts", TTS.on ? "1" : "0"); } catch (err) {}
+  $("ttsBtn").textContent = "播报：" + (TTS.on ? "开" : "关");
+};
+ttsInit();
 $("btnNew").onclick = openModal;
 $("btnCancel").onclick = closeModal;
 $("btnStart").onclick = startSession;

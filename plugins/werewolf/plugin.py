@@ -264,6 +264,13 @@ class WerewolfPlugin(BaseScenario):
             session.referee("第 {} 天。".format(st.day))
             sc_sheriff = sc.sheriff or {}
             if st.day == 1 and sc_sheriff.get("enabled"):
+                if self._election_destruct(session):
+                    session.referee("竞选被自爆中断：本局没有警长（吞警徽）。")
+                    session.referee("狼人在竞选期间自爆，直接进入黑夜。")
+                    winner = rules.check_win(st)
+                    if winner:
+                        break
+                    continue          # 跳过当天讨论与投票
                 self._elect_sheriff(session)
                 winner = rules.check_win(st)
                 if winner:
@@ -323,6 +330,30 @@ class WerewolfPlugin(BaseScenario):
         session.end(winner)
 
     # ---------- 警长 ----------
+    def _election_destruct(self, session) -> bool:
+        """竞选期间狼人是否自爆（吞警徽）。返回 True 表示竞选被中断。"""
+        st = self._state(session)
+        sc = self._scenario(session)
+        if not (sc.wolf_self_destruct or {}).get("enabled"):
+            return False
+        if not st.alive_wolves():
+            return False
+        card = session.open_round("竞选期自爆", "第 1 天", kind="vote")
+        hit = False
+        for seat in sorted(st.alive_wolves()):
+            action = self._act(session, seat, "wolf_destruct",
+                               "竞选期间要不要自爆（会吞掉本局警徽）？", round_id=card["id"])
+            if action.get("kind") != "destruct":
+                continue
+            role = st.role_of(seat)
+            rules.apply_deaths(st, [{"seat": seat, "cause": "destruct"}])
+            session.narrate("{} 号自爆，警徽被吞。".format(seat))
+            session.referee("{} 号身份：{}".format(seat, self._label(session, role)), public=False)
+            hit = True
+            break
+        session.close_round(card, "有人自爆" if hit else "无人自爆")
+        return hit
+
     def _elect_sheriff(self, session) -> None:
         """官方流程：上警 → 警上发言 → 可退水 → 警下投票 → 平票 PK 再投。"""
         st = self._state(session)

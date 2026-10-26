@@ -70,6 +70,19 @@ def choose(user_text: str, system_text: str = ""):
     if "【日间·表决】" in user_text:
         return ({"kind": "vote", "target": first, "reason": "压力位"},
                 "把票集中在 {} 号身上，逼他表态。".format(first))
+    # 规则怪谈：按座位制造"守规 / 违规 / 求助"三种行为
+    if "【条例·发言】" in user_text:
+        seat = _mock_seat(user_text, system_text)
+        mod = seat % 3
+        if mod == 1:
+            return ({"kind": "speak", "text": "今天夜里很安静，我先检查门。"},
+                    "别踩到禁词。")
+        if mod == 2:
+            # 违规：说到禁词 + 超长
+            return ({"kind": "speak", "text": "走廊上有血迹，我数了三遍，一共四滴，从二楼一直滴到楼梯口，没人清理。"},
+                    "好像说漏了。")
+        return ({"kind": "ask_rule", "rule": 2}, "我不太确定字数限制算标点吗？")
+
     # 公地困境：议约 / 附议
     if "【公地·议约】" in user_text:
         seat = _mock_seat(user_text, system_text)
