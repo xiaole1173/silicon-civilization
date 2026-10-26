@@ -212,7 +212,9 @@ class CommonsPlugin(BaseScenario):
             actions = self._act_many(session, sorted(session.agents), "take",
                                      "实际取用多少（0–{:g}）。".format(mx), card["id"])
             for seat in sorted(session.agents):
-                action = actions.get(seat) or {"kind": "take", "amount": 0}
+                action = actions.get(seat) or {"kind": "invalid"}
+                if action.get("kind") == "invalid":
+                    continue          # 没解析出来 = 数据缺失，不能当成"取了 0"
                 amount = action.get("amount")
                 cap_seat = mx * float(penalties.get(seat, 1.0))
                 try:
@@ -265,6 +267,10 @@ class CommonsPlugin(BaseScenario):
         summary = M.summarize(world, resource=res.name,
                               fair_share=self._fair_share(session), threshold=0.1)
         summary.update(session.contracts.stats())
+        invalid = int(session.meta.get("invalid_actions", 0))
+        summary["invalid_actions"] = invalid
+        takes = max(1, sum(len(r.get("items") or []) for r in session.rounds))
+        summary["invalid_rate"] = round(invalid / takes, 4)
         summary["collapse"] = 1 if (session.meta.get("collapse") or {}).get("collapsed") else 0
         summary["survived_rounds"] = (session.meta.get("collapse") or {}).get("survived_rounds", 0)
         # 声明与实际的偏差（信任指标）
@@ -288,7 +294,7 @@ class CommonsPlugin(BaseScenario):
             jobs.append((session.agents[seat], prompt, {
                 "channel": PUBLIC, "kind": "speak",
                 "budget": BUDGET.get(context, 768),
-                "validator": self._validator(context), "retries": 1,
+                "validator": self._validator(context), "retries": 2,
                 "label": "commons_" + context, "round_id": round_id,
             }))
         msgs = session.ask_many(jobs, max_workers=workers)
@@ -296,7 +302,11 @@ class CommonsPlugin(BaseScenario):
         for seat, msg in zip(seats, msgs):
             action = ep.parse_action((msg.text if msg else "") or "")
             if not action:
-                action = {"kind": "pass"}
+                action = {"kind": "invalid"}
+                session.meta["invalid_actions"] = int(session.meta.get("invalid_actions", 0)) + 1
+                if msg is not None:
+                    msg.meta = dict(msg.meta or {})
+                    msg.meta["parse_failed"] = True
             if msg is not None:
                 try:
                     shown = float(action.get("amount") or 0)

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 # 兼容旧代码里的中文名（内部机制用）
 ROLE_NAMES = {
@@ -252,10 +253,36 @@ def parse_action(raw: str) -> dict:
     start = text.find("{")
     end = text.rfind("}")
     if start >= 0 and end > start:
+        candidate = text[start:end + 1]
         try:
-            obj = json.loads(text[start:end + 1])
+            obj = json.loads(candidate)
             if isinstance(obj, dict):
                 return obj
         except json.JSONDecodeError:
-            return {}
+            try:
+                obj = json.loads(_repair_json(candidate))
+                if isinstance(obj, dict):
+                    return obj
+            except json.JSONDecodeError:
+                return {}
     return {}
+
+def _repair_json(text: str) -> str:
+    """把常见"伪 JSON"修成合法 JSON：全角引号、单引号、裸键名、尾逗号。"""
+    t = (text or "").strip()
+    for a, b in (("\u201c", '"'), ("\u201d", '"'), ("\uff02", '"'),
+                 ("\u2018", "'"), ("\u2019", "'")):
+        t = t.replace(a, b)
+    t = re.sub(r"'([^'\\]*)'\s*:", r'"\1":', t)        # 键用单引号
+    t = re.sub(r":\s*'([^']*)'", r': "\1"', t)          # 值用单引号
+    t = re.sub(r'([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:', r'\1"\2":', t)
+    t = re.sub(r',\s*([}\]])', r'\1', t)               # 尾逗号
+    # 裸词值：amount: 8 后面若跟着逗号/右括号，且不是数字/布尔/null，补上引号
+    def _quote(m):
+        val = m.group(2)
+        if val.lower() in ("true", "false", "null") or re.fullmatch(r"-?\d+(\.\d+)?", val):
+            return m.group(1) + val + m.group(3)
+        return m.group(1) + '"' + val + '"' + m.group(3)
+
+    t = re.sub(r'(:\s*)([A-Za-z_\u4e00-\u9fa5][\w\u4e00-\u9fa5]*)(\s*[,}])', _quote, t)
+    return t
