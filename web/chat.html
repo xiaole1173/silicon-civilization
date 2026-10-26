@@ -51,12 +51,12 @@
   .sess{display:block;width:100%;text-align:left;border:1px solid transparent;border-radius:var(--r-sm);
     padding:8px 10px;margin-bottom:4px;background:transparent;cursor:pointer}
   .sess:hover{background:var(--bg)}
-  .sess.on{background:var(--accent-weak);border-color:#d7e3fb}
+  .sess.on{background:var(--accent-weak);border-color:var(--outline)}
   .sess .t{font-size:13px;font-weight:600}
   .sess .s{font-size:11.5px;color:var(--muted)}
   .sesswrap{position:relative}
   .stopbtn{position:absolute;right:6px;top:8px;font-size:10.5px;padding:1px 7px;
-    border-radius:var(--r-pill);color:var(--err);background:var(--surface);border-color:#f3d6d2;display:none}
+    border-radius:var(--r-pill);color:var(--err);background:var(--surface);border-color:var(--err-weak);display:none}
   .sesswrap:hover .stopbtn{display:block}
 
   /* 中栏 */
@@ -65,9 +65,9 @@
 
   /* 裁判 */
   .ref{display:flex;gap:10px;align-items:flex-start;margin:14px 0;padding:9px 12px;
-    background:var(--surface-3);border-radius:var(--r-sm);color:#37414f;font-size:13px}
+    background:var(--surface-3);border-radius:var(--r-sm);color:var(--on-surface);font-size:13px}
   .ref .who{flex:none;font-weight:700;font-size:12px;color:var(--on-surface-mid);
-    border-right:1px solid #d9dee6;padding-right:10px}
+    border-right:1px solid var(--outline);padding-right:10px}
   .ref.private{background:var(--warn-weak);color:var(--warn)}
   .ref.private .who{color:var(--warn);border-color:var(--outline-strong)}
 
@@ -83,7 +83,7 @@
   .round-head .rx{margin-left:auto;font-size:11.5px;color:var(--brand);font-variant-numeric:tabular-nums}
   .round-body{padding:10px 13px}
   .round{box-shadow:var(--e1)}
-  .round.secret{border-color:var(--outline);background:#fcfdff}
+  .round.secret{border-color:var(--outline);background:var(--surface-2)}
   .round.secret .round-head{background:var(--surface-2)}
   .round.secret .rt{color:var(--info)}
   .round.public{border-color:var(--line)}
@@ -110,13 +110,13 @@
   .chbadge.secret{background:var(--info-weak);color:var(--info)}
   .chbadge.vote{background:var(--ok-weak);color:var(--ok)}
   .chbadge.public{background:var(--surface-3);color:var(--on-surface-mid)}
-  .vthink{margin-top:7px;border-top:1px dashed #eef1f5;padding-top:6px}
+  .vthink{margin-top:7px;border-top:1px dashed var(--surface-3);padding-top:6px}
   .vt{font-size:11.5px;color:var(--think);white-space:pre-wrap;margin:3px 0;
     max-height:120px;overflow:auto}
   button.tiny{font-size:11px;padding:1px 8px;border-radius:var(--r-pill);color:var(--on-surface-mid)}
   .fail{font-size:11.5px;color:var(--err);margin-top:3px}
   .vchip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:2px 8px;
-    border-radius:var(--r-pill);background:var(--surface-3);color:#4a5464}
+    border-radius:var(--r-pill);background:var(--surface-3);color:var(--on-surface-mid)}
   .vchip b{font-variant-numeric:tabular-nums}
   .abstain{color:var(--on-surface-low)}
   .think{margin-top:5px;border-left:2px solid var(--outline-strong);background:var(--think-bg);
