@@ -101,3 +101,19 @@ python scripts/run_experiment.py --plan horror --seeds 1-20 --concurrency 2
 - 已做的兜底：`providers` 现在会把"返回 HTML 登录页"直接报成明确错误，不会被当成空回答；
 - 待恢复后执行第 8 节的命令即可产出正式数据；
 - 数据一到位，只需把 REPORT.md 的结论段落抄进本文第 10 节即可。
+
+## 10. 额度恢复后的操作顺序
+
+```bash
+# 1) 先体检，确认哪些模型可用（会逐个试一次，很轻）
+python scripts/probe_gateway.py
+
+# 2) 可用数 ≥ 需要的座位数时再开跑（建议并发 1–2）
+python scripts/run_experiment.py --plan main --seeds 1-20 --seats 6 --concurrency 2 \
+    --price-in 0.5 --price-out 1.5
+```
+
+工程侧的两道保护：
+
+- **指数退避重试**：429/5xx 默认重试 3 次（5s→10s），可在模型配置里用 `retry_attempts` / `retry_wait` 调整；
+- **额度中止**：批次里连续两局失败调用中 ≥50% 是 429 时，自动标记 `state=quota` 并停止，避免空跑烧时间。

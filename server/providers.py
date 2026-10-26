@@ -240,6 +240,30 @@ def call_chat(conf: dict, messages: list, *, resolution: dict | None = None,
     use_stream = bool(conf.get("stream", False)) if stream is None else bool(stream)
     if on_delta is not None:
         use_stream = True          # 要实时进度就必须流式
+
+    # 限流/临时故障：指数退避重试（默认 3 次，可在模型配置里关掉）
+    attempts = int(conf.get("retry_attempts", 3) or 1)
+    waits = [float(conf.get("retry_wait", 5) or 5)]
+    for i in range(max(0, attempts - 1)):
+        waits.append(waits[-1] * 2)
+    last_exc = None
+    for attempt in range(max(1, attempts)):
+        try:
+            return _call_chat_inner(conf, messages, max_tokens=max_tokens,
+                                    temperature=temperature, timeout=timeout,
+                                    extra_body=extra_body, use_stream=use_stream,
+                                    on_delta=on_delta, thinking_cap=thinking_cap)
+        except ProviderError as exc:
+            last_exc = exc
+            retryable = getattr(exc, "status", None) in (429, 500, 502, 503, 504)
+            if not retryable or attempt >= attempts - 1:
+                raise
+            time.sleep(waits[min(attempt, len(waits) - 1)])
+    raise last_exc if last_exc else ProviderError("调用失败")
+
+
+def _call_chat_inner(conf, messages, *, max_tokens, temperature, timeout, extra_body,
+                     use_stream, on_delta, thinking_cap) -> dict:
     try:
         return _call_once(conf, messages, max_tokens=max_tokens, temperature=temperature,
                           timeout=timeout, extra_body=extra_body, stream=use_stream,

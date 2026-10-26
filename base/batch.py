@@ -95,6 +95,14 @@ def _execute(plugin, spec, base_config: dict, seats, title: str,
         row["tokens_out"] = t_out
         row["tokens_total"] = t_in + t_out
         row["usage_estimated"] = any(bool(u.get("estimated")) for u in usages)
+        # 额度/限流识别：失败调用里出现 429 的比例
+        fails = [str(((m.meta or {}).get("error") or "")) for m in session.messages
+                 if (m.meta or {}).get("ok") is False]
+        quota = sum(1 for f in fails if "429" in f or "限流" in f)
+        row["call_errors"] = len(fails)
+        row["quota_errors"] = quota
+        if fails and quota >= max(1, int(len(fails) * 0.5)):
+            row["state"] = "quota"
         price_in = float(cfg.get("price_in_per_m") or 0.0)
         price_out = float(cfg.get("price_out_per_m") or 0.0)
         if price_in or price_out:
@@ -149,8 +157,14 @@ def run_batch(plugin_id: str, *, seats, base_config: dict | None = None,
     executed = 0
     lock = threading.Lock()
 
+    quota_streak = [0]
+
     def record(row):
         nonlocal executed
+        if row.get("state") == "quota":
+            quota_streak[0] += 1
+        else:
+            quota_streak[0] = 0
         with lock:
             rows.append(row)
             executed += 1
@@ -166,9 +180,13 @@ def run_batch(plugin_id: str, *, seats, base_config: dict | None = None,
                                    title, per_run_timeout) for spec in pending]
             for fut in as_completed(futures):
                 record(fut.result())
+                if quota_streak[0] >= 2:
+                    break
     else:
         for spec in pending:
             record(_execute(plugin, spec, base_config or {}, seats, title, per_run_timeout))
+            if quota_streak[0] >= 2:
+                break
 
     if rows:
         metrics_mod.write_csv(str(index_path), rows)
@@ -177,6 +195,7 @@ def run_batch(plugin_id: str, *, seats, base_config: dict | None = None,
                "manifest": manifest_path, "runs": len(specs),
                "executed": executed, "skipped": len(done),
                "concurrency": int(concurrency or 1),
+               "aborted": "quota" if quota_streak[0] >= 2 else "",
                "errors": errors, "dir": str(out_dir)}
     try:
         import base.report as report_mod
