@@ -29,6 +29,17 @@ def parse_ctx(user_text: str) -> dict:
     return {"seat": seat, "alive": alive, "text": user_text}
 
 
+def _mock_seat(user_text: str, system_text: str = "") -> int:
+    for text in (user_text or "", system_text or ""):
+        m = re.search(r"座位 (\d+)", text)
+        if m:
+            return int(m.group(1))
+        m = re.search(r"你是 (\d+) 号", text)
+        if m:
+            return int(m.group(1))
+    return 0
+
+
 def choose(user_text: str, system_text: str = ""):
     ctx = parse_ctx(user_text)
     seat, alive = ctx["seat"], ctx["alive"]
@@ -59,6 +70,18 @@ def choose(user_text: str, system_text: str = ""):
     if "【日间·表决】" in user_text:
         return ({"kind": "vote", "target": first, "reason": "压力位"},
                 "把票集中在 {} 号身上，逼他表态。".format(first))
+    # 公地困境：议约 / 附议
+    if "【公地·议约】" in user_text:
+        seat = _mock_seat(user_text, system_text)
+        return ({"kind": "propose", "amount": 8} if seat == 1 else {"kind": "pass"},
+                "提个上限，大家自律一点。")
+
+    if "【公地·附议】" in user_text:
+        seat = _mock_seat(user_text, system_text)
+        # 每 3 个座位一个不守约的（不附议）
+        return ({"kind": "pass"} if seat % 3 == 0 else {"kind": "accept"},
+                "先答应，做不做另说。")
+
     # 公地困境：按座位给不同贪心度，制造分布差异
     if "【公地·声明】" in user_text or "【公地·取用】" in user_text:
         seat = 0
@@ -69,7 +92,8 @@ def choose(user_text: str, system_text: str = ""):
             m_seat = re.search(r"座位 (\d+)", system_text or "")
             if m_seat:
                 seat = int(m_seat.group(1))
-        greedy = (seat % 3 == 0)          # 每 3 个座位一个贪心户
+        # 1 号（契约提议者）也贪心：用来演示"说到做不到"与调解
+        greedy = (seat % 3 == 0) or (seat == 1)
         amount = 22 if greedy else 6
         kind = "declare" if "【公地·声明】" in user_text else "take"
         return ({"kind": kind, "amount": amount},

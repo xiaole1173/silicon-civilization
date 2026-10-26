@@ -33,6 +33,8 @@ CONTEXT_TAG = {
     "badge": "【出局·警徽移交】",
     "commons_declare": "【公地·声明】",
     "commons_take": "【公地·取用】",
+    "commons_propose": "【公地·议约】",
+    "commons_accept": "【公地·附议】",
 }
 
 CONTEXT_HINT = {
@@ -54,6 +56,8 @@ CONTEXT_HINT = {
     "badge": "你是警长且已出局：可以把警徽交给一个活着的人，也可以让它作废。",
     "commons_declare": "当众说明你这轮打算取用多少——所有人都会听到，但没人强制你守信。",
     "commons_take": "现在真正取用。想清楚：草场归零，所有人都输。",
+    "commons_propose": "你可以提议一个本轮全员取用上限；没人接受就作废。",
+    "commons_accept": "是否接受这个上限？接受后你若超额，会被记为违约。",
 }
 
 LEGAL = {
@@ -75,6 +79,8 @@ LEGAL = {
     "badge": ["pass_badge", "destroy"],
     "commons_declare": ["declare", "pass"],
     "commons_take": ["take"],
+    "commons_propose": ["propose", "pass"],
+    "commons_accept": ["accept", "pass"],
 }
 
 SCHEMA_TEXT = {

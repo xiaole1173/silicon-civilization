@@ -146,6 +146,7 @@ class CommonsPlugin(BaseScenario):
         mx = float(cfg.get("per_round_max", 25))
         collapsed = False
         last_round = 0
+        penalties = {}
 
         for rnd_no in range(1, rounds + 1):
             if session.stopped:
@@ -170,6 +171,37 @@ class CommonsPlugin(BaseScenario):
                 session.close_round(card, "，".join(
                     "{}号 {:g}".format(k, v) for k, v in sorted(declared.items()) if v is not None) or "—")
 
+            contract = None
+            if cfg.get("contracts", True):
+                cc = session.open_round("议约", "第 {} 轮".format(rnd_no), kind="vote")
+                props = self._act_many(session, sorted(session.agents), "propose",
+                                       "是否提议本轮全员取用上限？", cc["id"])
+                for seat in sorted(session.agents):
+                    a = props.get(seat) or {}
+                    if a.get("kind") != "propose":
+                        continue
+                    try:
+                        value = float(a.get("amount"))
+                    except (TypeError, ValueError):
+                        continue
+                    if 0 < value <= mx:
+                        contract = session.contracts.propose(seat, value, rnd_no)
+                        break
+                if contract is not None:
+                    acc = self._act_many(
+                        session, [s2 for s2 in sorted(session.agents) if s2 != contract.proposer],
+                        "accept", "有人提议本轮上限。",
+                        cc["id"], extra="提议上限 {:g}{}。".format(contract.value, res.unit))
+                    for seat, a in acc.items():
+                        if (a or {}).get("kind") == "accept":
+                            session.contracts.accept(seat, contract.id)
+                    session.close_round(cc, "上限 {:g}，{} 人接受".format(
+                        contract.value, len(contract.accepted)))
+                    session.referee("本轮契约：上限 {:g}{}，{} 人接受。".format(
+                        contract.value, res.unit, len(contract.accepted)))
+                else:
+                    session.close_round(cc, "无人提议")
+
             card = session.open_round("取用", "第 {} 轮".format(rnd_no))
             taken = {}
             actions = self._act_many(session, sorted(session.agents), "take",
@@ -177,13 +209,28 @@ class CommonsPlugin(BaseScenario):
             for seat in sorted(session.agents):
                 action = actions.get(seat) or {"kind": "take", "amount": 0}
                 amount = action.get("amount")
+                cap_seat = mx * float(penalties.get(seat, 1.0))
                 try:
-                    amount = max(0.0, min(mx, float(amount)))
+                    amount = max(0.0, min(cap_seat, float(amount)))
                 except (TypeError, ValueError):
                     amount = 0.0
                 event = world.extract(seat, res.name, amount, round_no=rnd_no)
                 taken[seat] = event["got"]
             session.close_round(card, "本轮共取 {:.0f}{}".format(sum(taken.values()), res.unit))
+
+            if contract is not None:
+                breaches = session.contracts.check(rnd_no, taken)
+                if breaches:
+                    session.referee("违约：{}".format("、".join(
+                        "{} 号取了 {:g}（上限 {:g}）".format(b["seat"], b["actual"], b["value"])
+                        for b in breaches)))
+                    if cfg.get("mediation", True):
+                        factor = float(cfg.get("mediation_penalty", 0.5))
+                        for b in breaches:
+                            penalties[b["seat"]] = penalties.get(b["seat"], 1.0) * factor
+                        session.referee("调解：违约者下一轮额度 ×{:g}。".format(factor))
+                else:
+                    session.referee("契约履行完毕，无人违约。")
 
             gained = world.settle(round_no=rnd_no)
             session.referee("结算：本轮取走 {:.0f}{}，草场恢复 {:.0f}{}，剩余 {:g}{}（{:.0%}）。".format(
@@ -199,6 +246,7 @@ class CommonsPlugin(BaseScenario):
         survived = 0 if collapsed else last_round
         session.referee("对局结束：{}（撑过 {} 轮，期末存量 {:g}{}）。".format(
             "草场崩溃" if collapsed else "草场保住", survived, res.amount, res.unit))
+        session.meta["contracts"] = session.contracts.to_dict()
         session.meta["collapse"] = {"collapsed": collapsed, "survived_rounds": survived,
                                     "final_stock": round(res.amount, 2)}
         session.end("collapsed" if collapsed else "sustained")
@@ -210,6 +258,7 @@ class CommonsPlugin(BaseScenario):
         res = next(iter(world.resources.values()))
         summary = M.summarize(world, resource=res.name,
                               fair_share=self._fair_share(session), threshold=0.1)
+        summary.update(session.contracts.stats())
         summary["collapse"] = 1 if (session.meta.get("collapse") or {}).get("collapsed") else 0
         summary["survived_rounds"] = (session.meta.get("collapse") or {}).get("survived_rounds", 0)
         # 声明与实际的偏差（信任指标）
@@ -219,7 +268,8 @@ class CommonsPlugin(BaseScenario):
         return dict(session.meta.get("collapse") or {})
 
     # ---------- 工具 ----------
-    def _act_many(self, session, seats, context: str, instruction: str, round_id: str = "") -> dict:
+    def _act_many(self, session, seats, context: str, instruction: str,
+                  round_id: str = "", extra: str = "") -> dict:
         """同相位并行提问：所有人同时被问，结算仍按座位顺序。"""
         cfg = self._cfg(session)
         workers = int(cfg.get("parallel_asks", 6) or 6)
@@ -227,8 +277,8 @@ class CommonsPlugin(BaseScenario):
         schema = ep.SCHEMA_TEXT.get("commons_" + context, "")
         jobs = []
         for seat in seats:
-            prompt = "你是 {} 号。{}{}\n只输出一个 JSON 对象，不要解释。\n输出格式：{}".format(
-                seat, tag, instruction, schema)
+            prompt = "你是 {} 号。{}{}{}\n只输出一个 JSON 对象，不要解释。\n输出格式：{}".format(
+                seat, tag, instruction, extra, schema)
             jobs.append((session.agents[seat], prompt, {
                 "channel": PUBLIC, "kind": "speak",
                 "budget": BUDGET.get(context, 768),

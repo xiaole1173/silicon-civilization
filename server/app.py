@@ -198,7 +198,7 @@ class Handler(BaseHTTPRequestHandler):
             info = {"name": path.name, "size": path.stat().st_size,
                     "mtime": int(path.stat().st_mtime)}
             try:
-                with path.open(encoding="utf-8") as fh:
+                with path.open(encoding="utf-8", errors="replace") as fh:
                     first = fh.readline()
                 meta = json.loads(first)
                 info.update({"seed": meta.get("seed"), "players": meta.get("players"),
@@ -324,7 +324,7 @@ class Handler(BaseHTTPRequestHandler):
         round_by_id = {}
         state_seq = []
         final = {}
-        with path.open(encoding="utf-8") as fh:
+        with path.open(encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 line = line.strip()
                 if not line:
@@ -424,7 +424,7 @@ class Handler(BaseHTTPRequestHandler):
         if not path.exists():
             return self._error(404, "没有这局的日志")
         events = []
-        with path.open(encoding="utf-8") as fh:
+        with path.open(encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 line = line.strip()
                 if not line:

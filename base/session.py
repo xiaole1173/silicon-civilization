@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "server"))
 
 import providers  # noqa: E402
 
+from base.contracts import ContractBook  # noqa: E402
 from base.message import OBSERVER, PUBLIC, Channel, Message  # noqa: E402
 from base.streaming import Broker  # noqa: E402
 
@@ -60,11 +61,13 @@ class Session:
         self.state = "created"
         self.stopped = False
         self.reputation: dict[int, float] = {}
+        self.contracts = ContractBook()
         self.winner = None
         self.meta: dict = {}
         self.started_at = time.time()
         self._seq = 0
         self._lock = threading.Lock()
+        self._log_lock = threading.Lock()
         self.log_path = ROOT / "runs" / "sessions" / (session_id + ".jsonl")
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self.log_path.write_text("", encoding="utf-8")
@@ -98,11 +101,17 @@ class Session:
 
     # ---------- 消息 ----------
     def _persist(self, event: dict) -> None:
+        # 并行提问时多个线程会同时写日志：加锁 + 一次性写字节，避免行交错损坏
         try:
-            with self.log_path.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(event, ensure_ascii=False) + "\n")
+            line = (json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8", "replace")
         except Exception:
-            pass
+            return
+        with self._log_lock:
+            try:
+                with self.log_path.open("ab") as fh:
+                    fh.write(line)
+            except Exception:
+                pass
 
     def _publish(self, event: dict) -> None:
         self.broker.publish(event)
