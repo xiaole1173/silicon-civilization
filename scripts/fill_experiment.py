@@ -87,7 +87,16 @@ def build_section(rows, batch_id: str, has_chart: bool) -> str:
                     vals.append(float(r.get(key)))
                 except (TypeError, ValueError):
                     continue
-            cells.append("{:.3f}".format(sum(vals) / len(vals)) if vals else "—")
+            if not vals:
+                cells.append("—")
+                continue
+            mean = sum(vals) / len(vals)
+            if len(vals) > 1:
+                var = sum((v - mean) ** 2 for v in vals) / (len(vals) - 1)
+                ci = 1.96 * (var / len(vals)) ** 0.5
+                cells.append("{:.3f}±{:.3f}".format(mean, ci))
+            else:
+                cells.append("{:.3f}".format(mean))
         lines.append("| {} | {} | {} |".format(cond, len(sub), " | ".join(cells)))
     lines.append("")
 

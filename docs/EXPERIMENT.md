@@ -147,12 +147,12 @@ python scripts/run_experiment.py --plan main --seeds 1-20 --seats 6 --concurrenc
 
 | 条件 | n | 合作率 | 基尼系数 | 枯竭轮次 | 崩溃比例 | 总取用 |
 |---|---|---|---|---|---|---|
-| regen_rate-0p02_communication-off | 5 | 0.922 | 0.120 | — | 0.000 | 12.760 |
-| regen_rate-0p02_communication-on | 5 | 0.961 | 0.131 | — | 0.000 | 16.580 |
-| regen_rate-0p05_communication-off | 5 | 0.839 | 0.032 | — | 0.000 | 29.960 |
-| regen_rate-0p05_communication-on | 5 | 1.000 | 0.000 | — | 0.000 | 28.800 |
-| regen_rate-0p1_communication-off | 5 | 0.917 | 0.045 | — | 0.000 | 62.840 |
-| regen_rate-0p1_communication-on | 5 | 1.000 | 0.018 | — | 0.000 | 58.640 |
+| regen_rate-0p02_communication-off | 5 | 0.922±0.053 | 0.120±0.070 | — | 0.000±0.000 | 12.760±1.330 |
+| regen_rate-0p02_communication-on | 5 | 0.961±0.064 | 0.131±0.232 | — | 0.000±0.000 | 16.580±10.989 |
+| regen_rate-0p05_communication-off | 5 | 0.839±0.011 | 0.032±0.003 | — | 0.000±0.000 | 29.960±0.078 |
+| regen_rate-0p05_communication-on | 5 | 1.000±0.000 | 0.000±0.000 | — | 0.000±0.000 | 28.800±0.000 |
+| regen_rate-0p1_communication-off | 5 | 0.917±0.067 | 0.045±0.044 | — | 0.000±0.000 | 62.840±4.188 |
+| regen_rate-0p1_communication-on | 5 | 1.000±0.000 | 0.018±0.005 | — | 0.000±0.000 | 58.640±0.805 |
 
 ![合作率](chart.svg)
 
