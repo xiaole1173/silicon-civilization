@@ -153,6 +153,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._stream_session(sid)
             if len(parts) == 4 and parts[3] == "log":
                 return self._session_log(sid)
+        if len(parts) == 4 and parts[1] == "replay" and parts[3] == "viz":
+            return self._session_viz(parts[2])
             sess = runner_mod.get_session(sid)
             if not sess:
                 return self._error(404, "会话不存在")
@@ -311,6 +313,103 @@ class Handler(BaseHTTPRequestHandler):
                 st = p.stat()
                 items.append({"id": p.stem, "size": st.st_size, "mtime": int(st.st_mtime)})
         return items
+
+    def _session_viz(self, sid):
+        """把 JSONL 日志归一化成回放台需要的结构（与场景无关）。"""
+        path = ROOT / "runs" / "sessions" / (sid + ".jsonl")
+        if not path.exists():
+            return self._error(404, "没有这局的日志")
+        agents, rounds, order = {}, [], []
+        round_by_id = {}
+        state_seq = []
+        final = {}
+        with path.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except Exception:
+                    continue
+                t = ev.get("type")
+                if t == "meta":
+                    for a in ev.get("agents") or []:
+                        agents[a["id"]] = {"id": a["id"], "name": a.get("name", ""),
+                                           "role": a.get("role", ""),
+                                           "model": a.get("model", ""),
+                                           "actions": 0}
+                elif t == "round_start":
+                    rnd = ev.get("round") or {}
+                    item = {"id": rnd.get("id"), "title": rnd.get("title", ""),
+                            "subtitle": rnd.get("subtitle", ""),
+                            "kind": rnd.get("kind", ""), "summary": "", "items": []}
+                    rounds.append(item)
+                    round_by_id[item["id"]] = item
+                    order.append(item["id"])
+                elif t == "round_end":
+                    rnd = round_by_id.get(ev.get("round"))
+                    if rnd:
+                        rnd["summary"] = ev.get("summary", "")
+                elif t == "message_start":
+                    m = ev.get("message") or {}
+                    meta = m.get("meta") or {}
+                    rid = m.get("round") or meta.get("round")
+                    rnd = round_by_id.get(rid)
+                    sid_sender = m.get("sender")
+                    if sid_sender is not None and sid_sender not in agents:
+                        # 老日志没有 meta：从消息反推参与者
+                        agents[sid_sender] = {"id": sid_sender,
+                                              "name": m.get("sender_name") or ("%s 号" % sid_sender),
+                                              "role": meta.get("role", ""),
+                                              "model": meta.get("model", ""),
+                                              "actions": 0}
+                    if rnd is not None and sid_sender is not None:
+                        act = meta.get("action") or {}
+                        rnd["items"].append({
+                            "id": m.get("id"), "seat": m.get("sender"),
+                            "name": m.get("sender_name", ""),
+                            "role": meta.get("role", ""),
+                            "model": meta.get("model", ""),
+                            "kind": act.get("kind") or ("speak" if m.get("kind") != "action" else ""),
+                            "target": act.get("target"),
+                            "text": "",
+                            "thinking": "",
+                            "latency_ms": meta.get("latency_ms"),
+                            "failed": meta.get("ok") is False,
+                        })
+                        if m.get("sender") in agents:
+                            agents[m["sender"]]["actions"] += 1
+                elif t == "message_end":
+                    mid = ev.get("id")
+                    for rnd in rounds:
+                        for it in rnd["items"]:
+                            if it["id"] == mid:
+                                it["text"] = ev.get("text") or ""
+                                think = (ev.get("thinking") or "").strip()
+                                it["thinking"] = think[:600]
+                                meta = ev.get("meta") or {}
+                                if meta.get("role"):
+                                    it["role"] = meta["role"]
+                                if meta.get("latency_ms"):
+                                    it["latency_ms"] = meta["latency_ms"]
+                                it["failed"] = meta.get("ok") is False
+                                break
+                elif t == "state":
+                    state_seq.append({"alive": ev.get("alive") or [],
+                                      "sheriff": ev.get("sheriff")})
+                elif t == "session" and ev.get("state") == "ended":
+                    final = {"winner": ev.get("winner"), "messages": ev.get("messages")}
+        total_items = sum(len(r["items"]) for r in rounds)
+        return self._json(200, {
+            "ok": True, "id": sid,
+            "agents": list(agents.values()),
+            "rounds": rounds,
+            "states": state_seq,
+            "final": final,
+            "metrics": {"rounds": len(rounds), "actions": total_items,
+                        "agents": len(agents)},
+        })
 
     def _session_log(self, sid):
         """从 JSONL 日志重放：会话重启后依然可回看。"""

@@ -3,427 +3,210 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Silicon Civilization · 社会仿真回放台 v0</title>
+<title>对局回放台</title>
 <link rel="stylesheet" href="../web/theme.css">
 <script src="../web/theme.js" defer></script>
 <style>
-  :root{
-    --bg:var(--bg); --panel:var(--surface); --line:var(--outline); --ink:var(--on-surface); --muted:var(--on-surface-mid);
-    --take:var(--err); --take-bg:var(--err-weak);
-    --give:var(--ok); --give-bg:var(--ok-weak);
-    --prop:var(--brand-press); --prop-bg:var(--info-weak);
-    --ok:var(--info);   --ok-bg:var(--info-weak);
-    --no:var(--warn);   --no-bg:var(--warn-weak);
-    --pass:var(--on-surface-mid); --pass-bg:var(--surface-3);
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font:14px/1.5 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;}
-  header{background:var(--panel);border-bottom:1px solid var(--line);
-    padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-  header h1{font-size:15px;margin:0;font-weight:650;white-space:nowrap;}
-  .chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);
-    border-radius:var(--r-pill);padding:2px 10px;white-space:nowrap;}
-  .chip b{color:var(--ink);font-weight:600;}
-  .spacer{flex:1;}
-  button{font:inherit;border:1px solid var(--line);background:var(--surface);border-radius:8px;
-    padding:5px 12px;cursor:pointer;}
-  button:hover{background:var(--surface-3);}
-  select{font:inherit;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:var(--surface);}
-  main{display:grid;grid-template-columns:236px 1fr 308px;gap:12px;padding:12px;height:calc(100vh - 53px);}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:12px;}
-  h2{font-size:12px;color:var(--muted);font-weight:600;margin:0 0 8px;letter-spacing:.04em;}
-  #agents{overflow:auto;}
-  .agent{padding:8px 0;border-bottom:1px dashed var(--line);}
-  .agent:last-child{border-bottom:0;}
-  .agent .nm{display:flex;justify-content:space-between;font-size:13px;}
-  .agent .role{color:var(--muted);font-size:12px;}
-  .agent .hold{font-variant-numeric:tabular-nums;font-weight:600;}
-  .bar{height:6px;background:var(--surface-3);border-radius:4px;margin-top:5px;overflow:hidden;}
-  .bar i{display:block;height:100%;background:var(--brand);border-radius:4px;transition:width .4s;}
-  #feedCard{display:flex;flex-direction:column;overflow:hidden;}
-  #feed{flex:1;overflow:auto;padding-right:4px;}
-  .round{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:var(--surface);}
-  .round-h{font-size:12px;color:var(--muted);margin-bottom:8px;display:flex;gap:10px;}
-  .round-h b{color:var(--ink);font-size:13px;}
-  .slots{display:flex;flex-direction:column;gap:6px;}
-  .slot{display:flex;align-items:flex-start;gap:8px;font-size:13px;}
-  .who{width:64px;color:var(--muted);flex:none;padding-top:2px;}
-  .pending{color:var(--on-surface-low);font-size:12.5px;padding-top:2px;opacity:.55;}
-  .dot{width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--outline-strong);flex:none;}
-  .act{border-radius:8px;padding:2px 10px;font-weight:600;font-size:12.5px;white-space:nowrap;}
-  .act.take{color:var(--take);background:var(--take-bg);}
-  .act.contribute{color:var(--give);background:var(--give-bg);}
-  .act.propose{color:var(--prop);background:var(--prop-bg);}
-  .act.accept{color:var(--ok);background:var(--ok-bg);}
-  .act.reject{color:var(--no);background:var(--no-bg);}
-  .act.pass{color:var(--pass);background:var(--pass-bg);}
-  details.why{margin-left:6px;}
-  details.why summary{color:var(--on-surface-low);font-size:11.5px;cursor:pointer;list-style:none;}
-  details.why summary::before{content:"为什么这样做";}
-  details.why[open] summary::before{content:"收起";}
-  details.why div{color:var(--muted);font-size:12px;margin-top:3px;font-weight:400;max-width:520px;}
-  details.why .tag{color:#b0b6bf;}
-  .resolve{margin-top:8px;font-size:12.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px;}
-  .resolve b{color:var(--ink);}
-  .collapse{margin-top:8px;border:1px solid #f3c0bb;background:var(--take-bg);color:var(--take);
-    border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:600;}
-  #right{display:flex;flex-direction:column;gap:12px;overflow:auto;}
-  .poolnum{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;}
-  .poolbar{height:10px;border-radius:6px;background:var(--surface-3);overflow:hidden;margin:8px 0 4px;}
-  .poolbar i{display:block;height:100%;border-radius:6px;transition:width .5s,background .5s;}
-  .thr{font-size:11.5px;color:var(--on-surface-low);}
-  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
-  .metric{background:var(--bg);border-radius:8px;padding:7px 9px;}
-  .metric .k{font-size:11.5px;color:var(--muted);}
-  .metric .v{font-size:17px;font-weight:650;font-variant-numeric:tabular-nums;}
-  .note{font-size:11.5px;color:var(--on-surface-low);line-height:1.5;}
-  svg{display:block;width:100%;height:auto;}
+  html,body{height:100%;overflow:hidden}
+  header{gap:var(--sp-2)}
+  .pick{display:flex;align-items:center;gap:var(--sp-2);margin-left:auto}
+  .pick select{width:230px}
+  main{display:grid;grid-template-columns:250px minmax(0,1fr) 280px;
+    height:calc(100vh - 56px);overflow:hidden}
+  #left{border-right:1px solid var(--outline);background:var(--surface);
+    padding:var(--sp-4);overflow:auto}
+  #center{overflow:auto;padding:var(--sp-4) var(--sp-5)}
+  #right{border-left:1px solid var(--outline);background:var(--surface);
+    padding:var(--sp-4);overflow:auto}
+  h2{font-size:var(--fs-12);color:var(--on-surface-mid);font-weight:600;margin:0 0 var(--sp-2)}
+  .member{display:flex;align-items:center;gap:var(--sp-2);padding:5px 0;
+    border-bottom:1px dashed var(--outline);white-space:nowrap}
+  .member.out{opacity:.45}
+  .member.out .nm{text-decoration:line-through}
+  .nm{font-size:var(--fs-13)}
+  .md{font-size:var(--fs-12);color:var(--on-surface-low);margin-left:auto}
+  .seat{width:22px;height:22px;border-radius:6px;color:#fff;font-size:11px;font-weight:700;
+    display:inline-flex;align-items:center;justify-content:center;flex:none}
+  .round{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-md);
+    box-shadow:var(--e1);margin:0 0 var(--sp-4);overflow:hidden}
+  .round-head{display:flex;align-items:center;gap:var(--sp-2);padding:7px var(--sp-3);
+    background:var(--surface-2);border-bottom:1px solid var(--outline);white-space:nowrap;overflow:hidden}
+  .rt{font-size:var(--fs-13);font-weight:650}
+  .rs{font-size:var(--fs-12);color:var(--on-surface-mid)}
+  .rx{margin-left:auto;font-size:var(--fs-12);color:var(--brand);overflow:hidden;
+    text-overflow:ellipsis;max-width:46%}
+  .item{display:flex;gap:var(--sp-2);align-items:flex-start;padding:6px var(--sp-3)}
+  .item+.item{border-top:1px dashed var(--outline)}
+  .ibody{min-width:0;flex:1}
+  .ihead{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+  .who{font-weight:600;font-size:var(--fs-12);white-space:nowrap}
+  .role{font-size:10px;padding:0 6px;border-radius:var(--r-pill);background:var(--brand-weak);
+    color:var(--brand-weak-ink);white-space:nowrap}
+  .mdl{font-size:10px;color:var(--on-surface-low);white-space:nowrap}
+  .lat{font-size:10px;color:var(--on-surface-low);margin-left:auto;white-space:nowrap}
+  .txt{margin-top:2px;font-size:var(--fs-13);white-space:pre-wrap;word-break:break-word}
+  .chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;padding:1px 9px;
+    border-radius:var(--r-pill);background:var(--surface-3);color:var(--on-surface-mid)}
+  .chip.kill{background:var(--err-weak);color:var(--err)}
+  .chip.vote{background:var(--ok-weak);color:var(--ok)}
+  .chip.check{background:var(--info-weak);color:var(--info)}
+  .chip.badge{background:var(--warn-weak);color:var(--warn)}
+  .kv{display:flex;justify-content:space-between;font-size:var(--fs-13);padding:3px 0;
+    color:var(--on-surface-mid)}
+  .kv b{color:var(--on-surface);font-variant-numeric:tabular-nums}
+  .empty{font-size:var(--fs-12);color:var(--on-surface-low);padding:var(--sp-4) 0}
+  .fail{font-size:11px;color:var(--err)}
 </style>
 </head>
 <body>
 <header>
-  <h1>社会仿真回放台</h1>
-  <span class="chip">情景：<b id="mScenario"></b></span>
-  <span class="chip">条件：<b id="mCondition"></b></span>
-  <span class="chip">seed <b id="mSeed"></b></span>
-  <span class="chip" id="roundLabel"></span>
-  <span class="spacer"></span>
-  <button id="btnPlay">播放</button>
-  <button id="btnStep">下一步</button>
-  <button id="btnReset">重置</button>
-  <select id="speed">
-    <option value="1">1x</option>
-    <option value="2" selected>2x</option>
-    <option value="4">4x</option>
-  </select>
+  <h1>对局回放台</h1>
+  <div class="pick">
+    <label for="sel" style="margin:0">选择日志</label>
+    <select id="sel"></select>
+    <button id="play">播放</button>
+    <button id="next">下一步</button>
+    <button id="reset">重置</button>
+  </div>
 </header>
 
 <main>
-  <section class="card" id="agents"><h2>成员 · 个人持有</h2><div id="agentList"></div></section>
-
-  <section class="card" id="feedCard">
-    <h2>动作流（同轮同时提交，结算后整批揭示）</h2>
-    <div id="feed"></div>
+  <aside id="left">
+    <h2>成员</h2>
+    <div id="members"><div class="empty">—</div></div>
+  </aside>
+  <section id="center">
+    <div id="timeline"><div class="empty">从右上角选择一局日志。</div></div>
   </section>
-
-  <div id="right">
-    <section class="card">
-      <h2>公共池</h2>
-      <div class="poolnum" id="poolNum">–</div>
-      <div class="poolbar"><i id="poolBar"></i></div>
-      <div class="thr">虚线为生存阈值 10；低于阈值 = 社会崩溃</div>
-      <div class="metrics">
-        <div class="metric"><div class="k">基尼系数</div><div class="v" id="giniV">–</div></div>
-        <div class="metric"><div class="k">本轮合作率</div><div class="v" id="coopV">–</div></div>
-        <div class="metric"><div class="k">T_survive</div><div class="v" id="tsurv">–</div></div>
-        <div class="metric"><div class="k">已揭示轮次</div><div class="v" id="shownV">0</div></div>
-      </div>
-    </section>
-    <section class="card">
-      <h2>公共池存量曲线</h2>
-      <svg id="chart" viewBox="0 0 272 150" aria-label="pool chart"></svg>
-    </section>
-    <section class="card">
-      <h2>说明</h2>
-      <div class="note">
-        本页数据为手工构造的示例（非模型输出），仅用于确认可视化样式。<br>
-        指标（基尼、合作率、T_survive）正式版由 Python 端计算，前端只显示。<br>
-        「为什么这样做」是 agent 的事后自述，不作为因果证据。<br>
-        正式接入：把 runner 输出成同构 JSONL，重放读文件、直播走 SSE，页面无需改动。
-      </div>
-    </section>
-  </div>
+  <aside id="right">
+    <h2>指标</h2>
+    <div id="metrics"><div class="kv"><span>进度</span><b>0 / 0</b></div></div>
+    <h2 style="margin-top:16px">说明</h2>
+    <div class="empty" style="padding-top:0">
+      数据来自 runs/sessions/*.jsonl，只读回放。每张卡是一个回合，右侧是结论；动作以彩色标签显示。
+    </div>
+  </aside>
 </main>
 
 <script>
-var RUN = {
-  scenario: "共享水源（公地困境）",
-  condition: "有沟通 · 无调解（示例）",
-  seed: 42,
-  initialPool: 100,
-  threshold: 10,
-  maxRounds: 7,
-  startHoldings: 10,
-  agents: [
-    {id:"a1", name:"阿岚", role:"果农"},
-    {id:"a2", name:"老周", role:"牧羊人"},
-    {id:"a3", name:"小满", role:"磨坊主"},
-    {id:"a4", name:"陈医生", role:"村医"},
-    {id:"a5", name:"阿宁", role:"外来户"}
-  ],
-  rounds: [
-    {regen:12, actions:[
-      {who:"a1", kind:"take", amount:8, why:"今年果树要浇水，先存一点保险。"},
-      {who:"a2", kind:"contribute", amount:4, why:"池子垮了大家都没水，我先出一份维护。"},
-      {who:"a3", kind:"take", amount:6, why:"磨坊不能停，按老习惯取。"},
-      {who:"a4", kind:"pass", why:"先看看其他人怎么做。"},
-      {who:"a5", kind:"take", amount:9, why:"刚来，不多取点怕吃亏。"}
-    ]},
-    {regen:11, actions:[
-      {who:"a1", kind:"take", amount:9, why:"大家都在取，我也不能落下。"},
-      {who:"a2", kind:"contribute", amount:4, why:"还是得有人维护。"},
-      {who:"a3", kind:"take", amount:7, why:"同上，随大流。"},
-      {who:"a4", kind:"propose", text:"每轮每人最多取 8 单位", why:"再不立规矩水要见底。"},
-      {who:"a5", kind:"take", amount:16, why:"多取点总没错，规矩还没定呢。"}
-    ]},
-    {regen:10, actions:[
-      {who:"a1", kind:"accept", target:"a4", why:"限额对我这种小户有利。"},
-      {who:"a2", kind:"accept", target:"a4", why:"早该如此。"},
-      {who:"a3", kind:"accept", target:"a4", why:"可以接受。"},
-      {who:"a4", kind:"pass", why:"提案已出，等阿宁表态。"},
-      {who:"a5", kind:"take", amount:14, why:"规矩是你们的，水又没写名字。"}
-    ]},
-    {regen:10, actions:[
-      {who:"a1", kind:"take", amount:8, why:"守着限额，应该还够。"},
-      {who:"a2", kind:"take", amount:8, why:"别人守我也守。"},
-      {who:"a3", kind:"take", amount:8, why:"按说好的来。"},
-      {who:"a4", kind:"contribute", amount:4, why:"提案没有约束力，继续补维护。"},
-      {who:"a5", kind:"take", amount:18, why:"他们自我限制，剩下的都是我的。"}
-    ]},
-    {regen:9, actions:[
-      {who:"a1", kind:"take", amount:10, why:"水在变少，再不多取就没了。"},
-      {who:"a2", kind:"pass", why:"取了也未必够，先观望。"},
-      {who:"a3", kind:"pass", why:"水已经浑了。"},
-      {who:"a4", kind:"pass", why:"提案失败了，我也无能为力。"},
-      {who:"a5", kind:"take", amount:20, why:"最后一波，不拿白不拿。"}
-    ]},
-    {regen:8, actions:[
-      {who:"a1", kind:"take", amount:7, why:"能捞一点是一点。"},
-      {who:"a2", kind:"pass", why:"……"},
-      {who:"a3", kind:"pass", why:"……"},
-      {who:"a4", kind:"pass", why:"没有谈判余地了。"},
-      {who:"a5", kind:"take", amount:15, why:"先顾好自己。"}
-    ]},
-    {regen:6, actions:[
-      {who:"a1", kind:"pass", why:"池里只剩一点，不敢动。"},
-      {who:"a2", kind:"pass", why:"……"},
-      {who:"a3", kind:"pass", why:"……"},
-      {who:"a4", kind:"pass", why:"……"},
-      {who:"a5", kind:"take", amount:15, why:"撑死胆大的。"}
-    ]}
-  ]
+var S = { logs: [], data: null, step: 0, timer: null };
+var PALETTE = ["#5b7cfa","#12a594","#c26a3d","#8e6bd6","#3a8fb7","#b4574f",
+               "#6b8f3d","#a2568f","#4d7a9c","#8a7b3f","#5f6f8a","#a05a6b"];
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function colorFor(seat){ return PALETTE[(Number(seat) - 1 + PALETTE.length) % PALETTE.length]; }
+function api(u){ return fetch(u).then(function(r){ return r.json(); }); }
+
+var KIND = { kill:["刀","kill"], vote:["票","vote"], check:["查","check"],
+             poison:["毒","badge"], save:["救","badge"], guard:["守","check"],
+             shoot:["开枪","kill"], pass_badge:["警徽","badge"], destruct:["自爆","badge"],
+             withdraw:["退水","badge"], stay:["不退水","badge"], run:["上警","badge"],
+             pass:["空过",""], abstain:["弃权",""] };
+
+function chip(it){
+  var m = KIND[it.kind];
+  if (!m) return "";
+  var t = (it.target !== null && it.target !== undefined && it.target !== "")
+    ? " → " + esc(it.target) + " 号" : "";
+  return '<span class="chip ' + m[1] + '">' + m[0] + '</span>' + t;
+}
+
+function loadLogs(){
+  return api("/api/replay").then(function(d){
+    S.logs = (d.logs || []).slice(0, 80).sort(function(a, b){ return b.size - a.size; });
+    var sel = $("sel");
+    sel.innerHTML = S.logs.map(function(l){
+      var kb = Math.max(1, Math.round(l.size / 1024));
+      return '<option value="' + esc(l.id) + '">' + esc(l.id) + " · " + kb + " KB</option>";
+    }).join("");
+    // 默认选内容最丰富的一局（小文件多为单元测试日志，没有回合）
+    var pick = S.logs.filter(function(l){ return l.size > 20000; })[0] || S.logs[0];
+    if (pick){
+      sel.value = pick.id;
+      loadViz(pick.id);
+    }
+  });
+}
+
+function loadViz(id){
+  $("timeline").innerHTML = '<div class="empty">载入中…</div>';
+  return api("/api/replay/" + encodeURIComponent(id) + "/viz").then(function(d){
+    if (!d.ok){ $("timeline").innerHTML = '<div class="empty">没有这局的日志</div>'; return; }
+    S.data = d; S.step = (d.rounds || []).length; render();
+  });
+}
+
+function render(){
+  var d = S.data; if (!d) return;
+  var alive = null;
+  var st = (d.states || []);
+  if (st.length) alive = st[st.length - 1].alive;
+  $("members").innerHTML = (d.agents || []).map(function(a){
+    var out = alive && alive.indexOf(a.id) < 0;
+    return '<div class="member' + (out ? " out" : "") + '">' +
+      '<span class="seat" style="background:' + colorFor(a.id) + '">' + a.id + '</span>' +
+      '<span class="nm">' + esc(a.name) + '</span>' +
+      (a.role ? '<span class="role">' + esc(a.role) + '</span>' : "") +
+      '<span class="md">' + a.actions + ' 次</span></div>';
+  }).join("") || '<div class="empty">—</div>';
+
+  var rounds = (d.rounds || []).slice(0, S.step);
+  $("timeline").innerHTML = rounds.map(function(r){
+    var items = (r.items || []).map(function(it){
+      var txt = (it.kind && it.kind !== "speak") ? chip(it) : esc(it.text || "");
+      var fail = it.failed ? '<div class="fail">调用失败</div>' : "";
+      return '<div class="item">' +
+        '<span class="seat" style="background:' + colorFor(it.seat) + '">' + it.seat + '</span>' +
+        '<div class="ibody"><div class="ihead">' +
+        '<span class="who">' + esc(it.name) + '</span>' +
+        (it.role ? '<span class="role">' + esc(it.role) + '</span>' : "") +
+        (it.model ? '<span class="mdl">' + esc(it.model) + '</span>' : "") +
+        (it.latency_ms ? '<span class="lat">' + it.latency_ms + 'ms</span>' : "") +
+        '</div><div class="txt">' + txt + "</div>" + fail + "</div></div>";
+    }).join("");
+    return '<div class="round"><div class="round-head">' +
+      '<span class="rt">' + esc(r.title) + '</span>' +
+      '<span class="rs">' + esc(r.subtitle) + '</span>' +
+      '<span class="rx">' + esc(r.summary || "") + '</span>' +
+      '</div>' + (items || '<div class="empty">（无动作）</div>') + "</div>";
+  }).join("") || '<div class="empty">还没有回合</div>';
+
+  var m = d.metrics || {};
+  $("metrics").innerHTML =
+    '<div class="kv"><span>进度</span><b>' + S.step + " / " + (d.rounds || []).length + '</b></div>' +
+    '<div class="kv"><span>回合</span><b>' + (m.rounds || 0) + '</b></div>' +
+    '<div class="kv"><span>动作</span><b>' + (m.actions || 0) + '</b></div>' +
+    '<div class="kv"><span>参与者</span><b>' + (m.agents || 0) + '</b></div>' +
+    ((d.final && d.final.winner) ? '<div class="kv"><span>胜方</span><b>' +
+      esc(d.final.winner) + '</b></div>' : "");
+}
+
+function stop(){ if (S.timer){ clearInterval(S.timer); S.timer = null; } $("play").textContent = "播放"; }
+function play(){
+  if (S.timer){ stop(); return; }
+  if (!S.data) return;
+  if (S.step >= S.data.rounds.length) S.step = 0;
+  $("play").textContent = "暂停";
+  S.timer = setInterval(function(){
+    if (!S.data || S.step >= S.data.rounds.length){ stop(); return; }
+    S.step++; render();
+  }, 1100);
+}
+
+$("sel").onchange = function(){ stop(); loadViz($("sel").value); };
+$("play").onclick = play;
+$("next").onclick = function(){
+  if (!S.data) return; stop();
+  S.step = Math.min(S.data.rounds.length, S.step + 1); render();
+};
+$("reset").onclick = function(){
+  stop();
+  if (S.data) S.step = (S.data.rounds || []).length;
+  render();
 };
 
-var byId = {};
-RUN.agents.forEach(function(a){ byId[a.id] = a; });
-var holdings = {}, pool = RUN.initialPool, shown = 0, tSurvive = null, trail = [{r:0, v:pool}];
-var playing = false, gen = 0;
-
-function $(id){ return document.getElementById(id); }
-function sleep(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
-function delays(){
-  var s = parseFloat($("speed").value);
-  return {gap: 220/s, step: 170/s, pause: 520/s};
-}
-function gini(vals){
-  var a = vals.slice().sort(function(x,y){return x-y;});
-  var n = a.length, sum = a.reduce(function(s,v){return s+v;},0) || 1, cum = 0;
-  a.forEach(function(v,i){ cum += (i+1)*v; });
-  return (2*cum)/(n*sum) - (n+1)/n;
-}
-
-function renderAgents(){
-  var maxH = 120;
-  $("agentList").innerHTML = RUN.agents.map(function(a){
-    var h = holdings[a.id];
-    return '<div class="agent"><div class="nm"><div>'+a.name+
-      ' <span class="role">'+a.role+'</span></div>'+
-      '<span class="hold">'+h+'</span></div>'+
-      '<div class="bar"><i style="width:'+Math.min(100,h/maxH*100)+'%"></i></div></div>';
-  }).join("");
-}
-function actionText(ac){
-  if(ac.kind==="take") return "索取 "+ac.amount;
-  if(ac.kind==="contribute") return "贡献 "+ac.amount;
-  if(ac.kind==="propose") return "提案："+ac.text;
-  if(ac.kind==="accept") return "接受 "+byId[ac.target].name+" 的提案";
-  if(ac.kind==="reject") return "拒绝提案";
-  return "沉默";
-}
-function chip(ac){
-  return '<span class="dot"></span><span class="act '+ac.kind+'">'+actionText(ac)+'</span>'+
-    (ac.why ? '<details class="why"><summary></summary><div>'+ac.why+
-      ' <span class="tag">（事后自述，非因果证据）</span></div></details>' : "");
-}
-function renderPool(){
-  $("poolNum").textContent = pool;
-  var pct = Math.max(0, Math.min(100, pool/RUN.initialPool*100));
-  var color = pool < RUN.threshold ? "#c0392b" : (pct < 35 ? "#e08a1e" : "#1e7e45");
-  var bar = $("poolBar");
-  bar.style.width = pct + "%"; bar.style.background = color;
-}
-function renderChart(){
-  var NS = "http://www.w3.org/2000/svg";
-  var svg = $("chart");
-  while (svg.firstChild) svg.removeChild(svg.firstChild);
-  var W=272,H=150,L=30,Rt=8,T=10,B=22;
-  var x = function(r){ return L + r/RUN.maxRounds*(W-L-Rt); };
-  var y = function(v){ return H-B - v/100*(H-T-B); };
-  function el(name, attrs, text){
-    var e = document.createElementNS(NS, name);
-    for (var k in attrs) e.setAttribute(k, attrs[k]);
-    if (text != null) e.textContent = text;
-    svg.appendChild(e);
-    return e;
-  }
-  el("line",{x1:L,y1:y(100),x2:W-Rt,y2:y(100),stroke:"#eef0f2"});
-  el("line",{x1:L,y1:y(50),x2:W-Rt,y2:y(50),stroke:"#f2f4f6"});
-  el("line",{x1:L,y1:y(RUN.threshold),x2:W-Rt,y2:y(RUN.threshold),stroke:"#c0392b","stroke-dasharray":"4 3",opacity:".7"});
-  el("text",{x:L-4,y:y(100)+4,"text-anchor":"end","font-size":"9",fill:"#9aa1ab"},"100");
-  el("text",{x:L-4,y:y(50)+4,"text-anchor":"end","font-size":"9",fill:"#9aa1ab"},"50");
-  el("text",{x:L-4,y:y(RUN.threshold)+3,"text-anchor":"end","font-size":"9",fill:"#c0392b"},"10");
-  if (trail.length > 1){
-    var d = trail.map(function(p,i){ return (i?"L":"M")+x(p.r).toFixed(1)+" "+y(p.v).toFixed(1); }).join(" ");
-    el("path",{d:d,fill:"none",stroke:"#2f6fdd","stroke-width":"2"});
-  }
-  trail.forEach(function(p){
-    el("circle",{cx:x(p.r),cy:y(p.v),r:"2.6",fill:p.v<RUN.threshold?"#c0392b":"#2f6fdd"});
-  });
-  for(var r=0;r<=RUN.maxRounds;r++){
-    el("text",{x:x(r),y:H-6,"text-anchor":"middle","font-size":"9",fill:"#9aa1ab"},String(r));
-  }
-}
-function renderAll(){
-  renderAgents(); renderPool(); renderChart();
-  $("shownV").textContent = shown;
-  $("roundLabel").innerHTML = "第 <b>"+shown+"</b> / "+RUN.maxRounds+" 轮";
-  $("giniV").textContent = shown ? gini(RUN.agents.map(function(a){return holdings[a.id];})).toFixed(2) : "–";
-  $('tsurv').textContent = tSurvive === null ? '–' : tSurvive + ' 轮（崩溃）';
-}
-
-function revealRound(i){
-  var rd = RUN.rounds[i], my = gen, d = delays();
-  var el = document.createElement("div");
-  el.className = "round";
-  el.innerHTML = '<div class="round-h"><b>第 '+(i+1)+' 轮</b><span>自然再生 +'+rd.regen+'</span></div>'+
-    '<div class="slots"></div><div class="resolve" style="display:none"></div>';
-  var feed = $("feed");
-  var hint = feed.querySelector(".note");
-  if (hint) hint.remove();
-  feed.appendChild(el);
-  var slots = el.querySelector(".slots");
-  slots.innerHTML = rd.actions.map(function(ac){
-    return '<div class="slot"><span class="who">'+byId[ac.who].name+'</span><span class="pending">待提交…</span></div>';
-  }).join("");
-  feed.scrollTop = feed.scrollHeight;
-  return sleep(d.gap).then(function(){
-    var nodes = slots.querySelectorAll(".slot");
-    var p = Promise.resolve();
-    rd.actions.forEach(function(ac,j){
-      p = p.then(function(){
-        if(gen!==my || !document.body.contains(el)) return;
-        nodes[j].innerHTML = '<span class="who">'+byId[ac.who].name+'</span>'+chip(ac);
-        feed.scrollTop = feed.scrollHeight;
-        return sleep(d.step);
-      });
-    });
-    return p;
-  }).then(function(){
-    if(gen!==my) return null;
-    var before = pool, take=0, give=0, coop=0;
-    rd.actions.forEach(function(ac){
-      if(ac.kind==="take"){ take += ac.amount; holdings[ac.who] += ac.amount; }
-      if(ac.kind==="contribute"){ give += ac.amount; holdings[ac.who] -= ac.amount; }
-      if(ac.kind==="contribute" || ac.kind==="propose" || ac.kind==="accept") coop++;
-    });
-    pool = Math.max(0, before + rd.regen - take + give);
-    trail.push({r:i+1, v:pool});
-    if (pool < RUN.threshold && tSurvive === null) tSurvive = i + 1;
-    var rs = el.querySelector(".resolve");
-    rs.style.display = "block";
-    rs.innerHTML = '结算：公共池 <b>'+before+'</b> → <b>'+pool+'</b>'+
-      '（再生 +'+rd.regen+' · 索取 -'+take+' · 贡献 +'+give+'）';
-    if(pool < RUN.threshold){
-      var b = document.createElement("div");
-      b.className = "collapse";
-      b.textContent = "公共池于第 "+(i+1)+" 轮跌破生存阈值（"+pool+" < "+RUN.threshold+"）：社会崩溃，T_survive = "+(i+1);
-      el.appendChild(b);
-    }
-    $("coopV").textContent = Math.round(coop/rd.actions.length*100) + "%";
-    renderAll();
-    feed.scrollTop = feed.scrollHeight;
-    return pool < RUN.threshold;
-  });
-}
-
-function instantRound(i){
-  var rd = RUN.rounds[i];
-  var before = pool, take=0, give=0, coop=0;
-  rd.actions.forEach(function(ac){
-    if(ac.kind==="take"){ take += ac.amount; holdings[ac.who] += ac.amount; }
-    if(ac.kind==="contribute"){ give += ac.amount; holdings[ac.who] -= ac.amount; }
-    if(ac.kind==="contribute" || ac.kind==="propose" || ac.kind==="accept") coop++;
-  });
-  pool = Math.max(0, before + rd.regen - take + give);
-  trail.push({r:i+1, v:pool});
-  if (pool < RUN.threshold && tSurvive === null) tSurvive = i + 1;
-  var rows = rd.actions.map(function(ac){
-    return '<div class="slot"><span class="who">'+byId[ac.who].name+'</span>'+chip(ac)+'</div>';
-  }).join("");
-  var el = document.createElement("div");
-  el.className = "round";
-  el.innerHTML = '<div class="round-h"><b>第 '+(i+1)+' 轮</b><span>自然再生 +'+rd.regen+'</span></div>'+
-    '<div class="slots">'+rows+'</div>'+
-    '<div class="resolve">结算：公共池 <b>'+before+'</b> → <b>'+pool+'</b>'+
-    '（再生 +'+rd.regen+' · 索取 -'+take+' · 贡献 +'+give+'）</div>'+
-    (pool < RUN.threshold ? '<div class="collapse">公共池于第 '+(i+1)+' 轮跌破生存阈值（'+pool+' < '+RUN.threshold+'）：社会崩溃，T_survive = '+(i+1)+'</div>' : "");
-  var feed = $("feed");
-  var hint = feed.querySelector(".note");
-  if (hint) hint.remove();
-  feed.appendChild(el);
-  $("coopV").textContent = Math.round(coop/rd.actions.length*100) + "%";
-}
-
-function updatePlayBtn(){ $("btnPlay").textContent = playing ? "暂停" : "播放"; }
-function play(){
-  if(playing){ playing = false; updatePlayBtn(); return; }
-  if(shown >= RUN.rounds.length) reset();
-  playing = true; updatePlayBtn();
-  var my = gen, d = delays();
-  function loop(){
-    if(!playing || gen!==my || shown>=RUN.rounds.length){ playing=false; updatePlayBtn(); return; }
-    revealRound(shown).then(function(collapsed){
-      if(gen!==my) return;
-      shown++; renderAll();
-      if(collapsed){ playing=false; updatePlayBtn(); return; }
-      setTimeout(loop, d.pause);
-    });
-  }
-  loop();
-}
-function step(){
-  if(playing || shown>=RUN.rounds.length) return;
-  var my = gen;
-  revealRound(shown).then(function(collapsed){
-    if(gen!==my) return;
-    shown++; renderAll();
-    if(collapsed){ playing=false; updatePlayBtn(); }
-  });
-}
-function reset(){
-  gen++; playing = false; shown = 0; pool = RUN.initialPool; tSurvive = null; trail = [{r:0,v:pool}];
-  RUN.agents.forEach(function(a){ holdings[a.id] = RUN.startHoldings; });
-  $("feed").innerHTML = '<div class="note" style="padding:10px 2px">点击「播放」或「下一步」开始回放；同轮动作先占位、结算后整批揭示。</div>';
-  $("coopV").textContent = "–";
-  renderAll(); updatePlayBtn();
-}
-
-$("mScenario").textContent = RUN.scenario;
-$("mCondition").textContent = RUN.condition;
-$("mSeed").textContent = RUN.seed;
-$("btnPlay").onclick = play;
-$("btnStep").onclick = step;
-$("btnReset").onclick = reset;
-reset();
-var _q = new URLSearchParams(location.search);
-if (_q.has("auto")) play();
-var _shot = parseInt(_q.get("shot") || "0", 10);
-if (_shot > 0){
-  for (var _i = 0; _i < Math.min(_shot, RUN.rounds.length); _i++) instantRound(_i);
-  shown = _i;
-  renderAll();
-}
+loadLogs();
 </script>
 </body>
 </html>
