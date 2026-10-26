@@ -321,17 +321,31 @@ class Handler(BaseHTTPRequestHandler):
         return self._error(404, "未知接口")
 
     # ---------- 批次 ----------
+    def _batches_dirs(self):
+        return [ROOT / "runs" / "batches", ROOT / "runs" / "experiments"]
+
     def _batches_dir(self):
         return ROOT / "runs" / "batches"
 
+    def _find_batch_dir(self, bid: str):
+        for base in self._batches_dirs():
+            cand = base / bid
+            if cand.is_dir():
+                return cand
+        return None
+
     def _list_batches(self):
-        base = self._batches_dir()
         items = []
-        if base.is_dir():
-            dirs = sorted(base.glob("*/"), key=lambda d: d.stat().st_mtime, reverse=True)
-            for d in dirs[:60]:
+        dirs = []
+        for base in self._batches_dirs():
+            if base.is_dir():
+                dirs.extend(list(base.glob("*/")))
+        dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+        if dirs:
+            for d in dirs[:80]:
                 summary_path = d / "summary.json"
-                info = {"id": d.name, "mtime": int(d.stat().st_mtime)}
+                info = {"id": d.name, "mtime": int(d.stat().st_mtime),
+                        "source": d.parent.name}
                 if summary_path.exists():
                     try:
                         with summary_path.open(encoding="utf-8") as fh:
@@ -347,8 +361,8 @@ class Handler(BaseHTTPRequestHandler):
                                 "progress": dict(batch_progress)})
 
     def _batch_detail(self, bid: str):
-        d = self._batches_dir() / bid
-        if not d.is_dir():
+        d = self._find_batch_dir(bid)
+        if d is None:
             return self._error(404, "批次不存在")
         out = {"ok": True, "id": bid, "rows": [], "report": "", "summary": {}}
         sp = d / "summary.json"
@@ -376,7 +390,9 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(200, out)
 
     def _batch_file(self, bid: str, name: str, ctype: str):
-        d = self._batches_dir() / bid
+        d = self._find_batch_dir(bid)
+        if d is None:
+            return self._error(404, "批次不存在")
         p = d / name
         if not p.exists():
             return self._error(404, "文件不存在")
