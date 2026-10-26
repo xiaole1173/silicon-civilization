@@ -159,7 +159,7 @@ def svg_chart(points, title: str, ylabel: str = "", width: int = 520, height: in
     if not pts:
         return ""
     top = max(p["mean"] + (p.get("ci") or 0) for p in pts) or 1.0
-    pad_l, pad_r, pad_t, pad_b = 44, 12, 18, 34
+    pad_l, pad_r, pad_t, pad_b = 44, 12, 30, 34
     inner_w = width - pad_l - pad_r
     inner_h = height - pad_t - pad_b
     slot = inner_w / max(1, len(pts))
@@ -179,7 +179,7 @@ def svg_chart(points, title: str, ylabel: str = "", width: int = 520, height: in
                         % (x + w / 2, cy, x + w / 2, y + ch))
             bars.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#8b929d"/>'
                         % (x + w / 2 - 4, cy, x + w / 2 + 4, cy))
-        bars.append('<text x="%.1f" y="%.1f" font-size="10" fill="#5b636f" '
+        bars.append('<text x="%.1f" y="%.1f" font-size="9" fill="#5b636f" '
                     'text-anchor="middle">%s</text>' % (x + w / 2, height - 12, p["label"]))
         bars.append('<text x="%.1f" y="%.1f" font-size="10" fill="#2b2f36" '
                     'text-anchor="middle">%.3f</text>' % (x + w / 2, y - 5, p["mean"]))
@@ -199,6 +199,19 @@ def chart_points(rows, metric_key: str) -> list:
     comps = compare(rows, [metric_key])
     for c in comps:
         v = (c["agg"].get(metric_key) or {})
-        out.append({"label": c["condition"].replace("regen_rate-", "ρ=").replace("p", "."),
+        out.append({"label": _short_label(c["condition"]),
                     "mean": v.get("mean"), "ci": v.get("ci95")})
     return out
+
+def _short_label(cond: str) -> str:
+    """把条件名压成适合画在图上的短标签。"""
+    text = str(cond or "base")
+    for key, repl in (("regen_rate-", "ρ="), ("communication-", "沟通"),
+                      ("contracts-", "契约"), ("mediation-", "调解"),
+                      ("info_visibility-", "视野"), ("show_reputation-", "声誉")):
+        text = text.replace(key, repl)
+    text = text.replace("0p0", "0.0").replace("0p1", "0.1").replace("0p", "0.")
+    text = text.replace("_on", "开").replace("_off", "关")
+    text = text.replace("on", "开").replace("off", "关")
+    text = text.replace("_", "·").replace("full", "全").replace("self", "自")
+    return text[:14]
