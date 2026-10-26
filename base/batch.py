@@ -95,6 +95,10 @@ def _execute(plugin, spec, base_config: dict, seats, title: str,
         row["tokens_out"] = t_out
         row["tokens_total"] = t_in + t_out
         row["usage_estimated"] = any(bool(u.get("estimated")) for u in usages)
+        price_in = float(cfg.get("price_in_per_m") or 0.0)
+        price_out = float(cfg.get("price_out_per_m") or 0.0)
+        if price_in or price_out:
+            row["cost_usd"] = round(t_in / 1e6 * price_in + t_out / 1e6 * price_out, 6)
     except Exception as exc:
         row["state"] = "error"
         row["error"] = repr(exc)[:200]
@@ -176,7 +180,7 @@ def run_batch(plugin_id: str, *, seats, base_config: dict | None = None,
                "errors": errors, "dir": str(out_dir)}
     try:
         import base.report as report_mod
-        md = report_mod.build(rows, manifest)
+        md = report_mod.build(rows, manifest, chart_dir=str(out_dir))
         summary["report"] = report_mod.write(str(out_dir / "REPORT.md"), md)
     except Exception as exc:
         summary["report_error"] = repr(exc)
