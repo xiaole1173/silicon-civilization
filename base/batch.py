@@ -76,8 +76,9 @@ def _execute(plugin, spec, base_config: dict, seats, title: str,
     row = {"run_id": spec.run_id, "condition": condition_name(spec.condition),
            "seed": spec.seed, "communication": cfg.get("communication", "on")}
     try:
-        session = runner_mod.create_session(spec.run_id, plugin, cfg, seats,
-                                            title or plugin.name)
+        label = title or "{} · {} · s{}".format(plugin.name,
+                                                condition_name(spec.condition), spec.seed)
+        session = runner_mod.create_session(spec.run_id, plugin, cfg, seats, label)
         thread = runner_mod.start(session)
         thread.join(timeout=per_run_timeout)
         row["state"] = session.state

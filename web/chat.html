@@ -695,7 +695,7 @@ function attachStatic(sid){
   S.cur = sid; S.msgs = {}; S.rounds = {}; S.roundMeta = {}; S.agents = {};
   $("stream").innerHTML = "";
   return api("/api/sessions/" + encodeURIComponent(sid)).then(function(d){
-    if (!d.ok){ $("stream").innerHTML = '<div class="hint">会话不存在</div>'; return; }
+    if (!d.ok){ replayLog(sid); return; }
     var s = d.session;
     $("pluginName").textContent = s.scenario || "—";
     (s.agents || []).forEach(function(a){ S.agents[a.id] = a; });
@@ -729,10 +729,21 @@ function attachStatic(sid){
 }
 
 /* ---------- 会话列表 / 新建 ---------- */
+function isBatchId(id){
+  return /^b[0-9a-f]{8,}-/.test(String(id || ""));
+}
+
 function loadSessions(){
   return api("/api/sessions").then(function(d){
     S.sessions = d.sessions || [];
-    $("sessList").innerHTML = S.sessions.length ? S.sessions.map(function(s){
+    var manual = S.sessions.filter(function(s){ return !isBatchId(s.id); });
+    var batched = S.sessions.filter(function(s){ return isBatchId(s.id); });
+    var list = S.showBatch ? S.sessions : manual;
+    var head = batched.length
+      ? '<button class="sess" id="batchToggle" style="width:100%;text-align:left">' +
+        '<div class="s">批次对局 ' + batched.length + " 局 · " + (S.showBatch ? "点击隐藏" : "点击展开") + '</div></button>'
+      : '';
+    $("sessList").innerHTML = head + (list.length ? list.map(function(s){
       var live = s.state === "running";
       return '<div class="sesswrap">' +
         '<button class="sess' + (S.cur === s.id ? " on" : "") + '" data-id="' + esc(s.id) + '">' +
@@ -742,7 +753,11 @@ function loadSessions(){
         (live ? '<button class="stopbtn" data-stop="' + esc(s.id) + '" title="结束这局">结束</button>' : '') +
         (s.state === "paused" ? '<button class="stopbtn" data-resume="' + esc(s.id) + '" title="从那一步继续">继续</button>' : '') +
         '</div>';
-    }).join("") : '<div class="hint">还没有会话</div>';
+    }).join("") : '<div class="hint">还没有会话</div>');
+    var toggle = $("batchToggle");
+    if (toggle){
+      toggle.onclick = function(){ S.showBatch = !S.showBatch; loadSessions(); };
+    }
   });
 }
 function loadPlugins(){

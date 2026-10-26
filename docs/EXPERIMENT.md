@@ -141,21 +141,21 @@ python scripts/run_experiment.py --plan main --seeds 1-20 --seats 6 --concurrenc
 
 <!-- RESULTS:BEGIN -->
 
-### 结果（自动生成，批次 `b9d0f89bb15`）
+### 结果（自动生成，批次 `b9d0f89bb15 + b9aa4b77277`）
 
-共 30 局（有效 30），tokens 648370，估算成本 0.3497 USD。
+共 120 局（有效 120），tokens 2544874，估算成本 1.3730 USD。
 
 | 条件 | n | 合作率 | 基尼系数 | 枯竭轮次 | 崩溃比例 | 总取用 |
 |---|---|---|---|---|---|---|
-| regen_rate-0p02_communication-off | 5 | 0.922±0.053 | 0.120±0.070 | — | 0.000±0.000 | 12.760±1.330 |
-| regen_rate-0p02_communication-on | 5 | 0.961±0.064 | 0.131±0.232 | — | 0.000±0.000 | 16.580±10.989 |
-| regen_rate-0p05_communication-off | 5 | 0.839±0.011 | 0.032±0.003 | — | 0.000±0.000 | 29.960±0.078 |
-| regen_rate-0p05_communication-on | 5 | 1.000±0.000 | 0.000±0.000 | — | 0.000±0.000 | 28.800±0.000 |
-| regen_rate-0p1_communication-off | 5 | 0.917±0.067 | 0.045±0.044 | — | 0.000±0.000 | 62.840±4.188 |
-| regen_rate-0p1_communication-on | 5 | 1.000±0.000 | 0.018±0.005 | — | 0.000±0.000 | 58.640±0.805 |
+| regen_rate-0p02_communication-off | 20 | 0.954±0.022 | 0.077±0.036 | — | 0.000±0.000 | 12.020±0.673 |
+| regen_rate-0p02_communication-on | 20 | 0.981±0.021 | 0.073±0.088 | — | 0.000±0.000 | 15.240±6.218 |
+| regen_rate-0p05_communication-off | 20 | 0.861±0.020 | 0.027±0.004 | — | 0.000±0.000 | 29.800±0.142 |
+| regen_rate-0p05_communication-on | 20 | 0.989±0.016 | 0.007±0.012 | — | 0.000±0.000 | 29.080±0.508 |
+| regen_rate-0p1_communication-off | 20 | 0.915±0.027 | 0.031±0.011 | — | 0.000±0.000 | 61.180±1.108 |
+| regen_rate-0p1_communication-on | 20 | 0.997±0.004 | 0.016±0.003 | — | 0.000±0.000 | 58.860±0.405 |
 
-![合作率](chart.svg)
+![合作率](chart-main.svg)
 
-**结论**：合作率最高的是 `regen_rate-0p05_communication-on`（1.000），最低的是 `regen_rate-0p05_communication-off`（0.839）。
+**结论**：合作率最高的是 `regen_rate-0p1_communication-on`（0.997），最低的是 `regen_rate-0p05_communication-off`（0.861）。
 
 <!-- RESULTS:END -->

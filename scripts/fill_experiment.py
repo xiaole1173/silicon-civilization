@@ -59,6 +59,13 @@ def fmt(v) -> str:
     return "{:.3f}".format(f)
 
 
+def load_rows_multi(root: str, ids: list):
+    rows = []
+    for bid in ids:
+        rows.extend(load_rows(os.path.join(root, "runs", "experiments", bid)))
+    return rows
+
+
 def build_section(rows, batch_id: str, has_chart: bool) -> str:
     lines = [BEGIN, "", "### 结果（自动生成，批次 `{}`）".format(batch_id), ""]
     n_runs = len(rows)
@@ -120,40 +127,54 @@ def build_section(rows, batch_id: str, has_chart: bool) -> str:
     return "\n".join(lines)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--batch", default="")
-    ap.add_argument("--doc", default=os.path.join(ROOT, "docs", "EXPERIMENT.md"))
-    args = ap.parse_args()
-
-    batch_id = args.batch or latest_batch(ROOT)
-    batch_dir = os.path.join(ROOT, "runs", "experiments", batch_id)
-    rows = load_rows(batch_dir)
-    if not rows:
-        raise SystemExit("批次没有数据")
-    has_chart = os.path.exists(os.path.join(batch_dir, "chart.svg"))
-    section = build_section(rows, batch_id, has_chart)
-
-    with open(args.doc, encoding="utf-8") as fh:
+def write_section(path: str, section: str) -> None:
+    with open(path, encoding="utf-8") as fh:
         doc = fh.read()
     if BEGIN in doc and END in doc:
         doc = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), section, doc, flags=re.S)
     else:
         doc = doc.rstrip() + "\n\n## 11. 结果\n\n" + section + "\n"
-    with open(args.doc, "w", encoding="utf-8") as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         fh.write(doc)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--batch", default="")
+    ap.add_argument("--batches", default="", help="逗号分隔多个批次，合并统计")
+    ap.add_argument("--doc", default=os.path.join(ROOT, "docs", "EXPERIMENT.md"))
+    args = ap.parse_args()
+
+    if args.batches:
+        ids = [x.strip() for x in args.batches.split(",") if x.strip()]
+        rows = load_rows_multi(ROOT, ids)
+        batch_id = " + ".join(ids)
+    else:
+        batch_id = args.batch or latest_batch(ROOT)
+        rows = load_rows(os.path.join(ROOT, "runs", "experiments", batch_id))
+    if not rows:
+        raise SystemExit("批次没有数据")
+
+    chart_name = "chart-main.svg"
+    has_chart = False
+    try:
+        pts = report_mod.chart_points(rows, "m_cooperation_rate")
+        svg = report_mod.svg_chart(pts, "合作率（均值 ±95%CI）", "合作率")
+        if svg:
+            with open(os.path.join(ROOT, "docs", chart_name), "w", encoding="utf-8") as fh:
+                fh.write(svg)
+            has_chart = True
+    except Exception as exc:
+        print("图表生成失败：", repr(exc))
+
+    section = build_section(rows, batch_id, has_chart).replace("chart.svg", chart_name)
+    write_section(args.doc, section)
     print("已写入", args.doc, "（批次", batch_id, "，", len(rows), "局）")
 
-    # 同步更新结论文档（如果存在）
     findings = os.path.join(ROOT, "docs", "FINDINGS.md")
     if os.path.exists(findings) and os.path.abspath(findings) != os.path.abspath(args.doc):
-        with open(findings, encoding="utf-8") as fh:
-            doc2 = fh.read()
-        if BEGIN in doc2 and END in doc2:
-            doc2 = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), section, doc2, flags=re.S)
-            with open(findings, "w", encoding="utf-8") as fh:
-                fh.write(doc2)
-            print("已同步", findings)
+        write_section(findings, section)
+        print("已同步", findings)
 
 
 if __name__ == "__main__":

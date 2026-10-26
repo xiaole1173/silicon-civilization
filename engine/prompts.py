@@ -234,6 +234,49 @@ def build_messages(view: dict) -> list:
     ]
 
 
+
+def _normalize_action(obj):
+    """模型的键名五花八门：action/type→kind，content→text，value→amount。
+
+    只在语义匹配时补字段（例如 take 才补 amount），避免把无关数字当成数量。
+    """
+    if not isinstance(obj, dict):
+        return obj
+    if "kind" not in obj:
+        for alt in ("action", "type", "op"):
+            if isinstance(obj.get(alt), str):
+                obj["kind"] = obj[alt]
+                break
+    kind = obj.get("kind")
+    if kind == "speak" and "text" not in obj:
+        for alt in ("content", "message", "say", "reply"):
+            if isinstance(obj.get(alt), str):
+                obj["text"] = obj[alt]
+                break
+    if kind in ("take", "declare", "propose") and "amount" not in obj:
+        for alt in ("value", "num", "quantity", "count"):
+            if isinstance(obj.get(alt), (int, float)):
+                obj["amount"] = obj[alt]
+                break
+    if "kind" not in obj:
+        # 形如 {"speak": "内容"} / {"take": 8}：动作名被当成键
+        KNOWN = ("speak", "pass", "take", "declare", "accept", "propose", "ask_rule",
+                 "destruct", "vote", "run", "withdraw", "stay", "kill", "check",
+                 "save", "poison", "guard", "shoot", "noop")
+        for key in list(obj.keys()):
+            if key in KNOWN:
+                obj["kind"] = key
+                val = obj.get(key)
+                if isinstance(val, str):
+                    obj.setdefault("text", val)
+                elif isinstance(val, (int, float)):
+                    obj.setdefault("amount", val)
+                break
+    if "target" not in obj and "seat" in obj:
+        obj["target"] = obj["seat"]
+    return obj
+
+
 def parse_action(raw: str) -> dict:
     """从模型输出里抠出 JSON 对象，容忍 markdown 代码围栏与前后废话。"""
     fence = chr(96) * 3
@@ -247,7 +290,7 @@ def parse_action(raw: str) -> dict:
     try:
         obj = json.loads(text)
         if isinstance(obj, dict):
-            return obj
+            return _normalize_action(obj)
     except json.JSONDecodeError:
         pass
     start = text.find("{")
@@ -257,12 +300,12 @@ def parse_action(raw: str) -> dict:
         try:
             obj = json.loads(candidate)
             if isinstance(obj, dict):
-                return obj
+                return _normalize_action(obj)
         except json.JSONDecodeError:
             try:
                 obj = json.loads(_repair_json(candidate))
                 if isinstance(obj, dict):
-                    return obj
+                    return _normalize_action(obj)
             except json.JSONDecodeError:
                 return {}
     return {}
