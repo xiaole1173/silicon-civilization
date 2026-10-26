@@ -246,6 +246,35 @@ class Session:
         return msg
 
     # ---------- 其他 ----------
+    def ask_many(self, jobs, max_workers: int = 6) -> list:
+        """并行提问（同相位多 agent）。
+
+        jobs: [(agent, instruction, kwargs_dict), ...]
+        并行结束后按座位号重排这一批消息，保证历史顺序与并发无关。
+        """
+        from concurrent.futures import ThreadPoolExecutor
+        if not jobs:
+            return []
+        start = len(self.messages)
+        results = [None] * len(jobs)
+
+        def run(i, job):
+            agent, instruction = job[0], job[1]
+            kw = dict(job[2] or {}) if len(job) > 2 else {}
+            try:
+                results[i] = self.ask(agent, instruction, **kw)
+            except Exception:
+                results[i] = None
+
+        with ThreadPoolExecutor(max_workers=max(1, min(max_workers, len(jobs)))) as pool:
+            list(pool.map(lambda pair: run(*pair), enumerate(jobs)))
+
+        tail = self.messages[start:]
+        if tail:
+            tail.sort(key=lambda m: (m.sender or 0, m.seq))
+            self.messages[start:] = tail
+        return results
+
     def narrate(self, text: str, channel: str = PUBLIC) -> Message:
         return self.add_message(channel, None, kind="system", text=text)
 

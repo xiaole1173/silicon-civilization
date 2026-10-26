@@ -105,5 +105,21 @@ class TestCommunicationSwitch(unittest.TestCase):
         self.assertFalse(s2.visible_to(1, s2.messages[-1]), "沟通关时不可见")
 
 
+class TestBatchConcurrency(unittest.TestCase):
+    def test_concurrent_runs_all_recorded(self):
+        with tempfile.TemporaryDirectory() as td, \
+                mock.patch.object(providers, "call_chat", side_effect=fake_call):
+            summary = batch_mod.run_batch(
+                "discussion", seats=_seats(3), base_config={"rounds": 1},
+                seeds=[1, 2, 3, 4], out_root=td, concurrency=3)
+            self.assertEqual(summary["executed"], 4)
+            self.assertEqual(summary["concurrency"], 3)
+            self.assertEqual(len(summary["errors"]), 0)
+            rows = list(csv.DictReader(open(summary["index"], encoding="utf-8-sig")))
+            self.assertEqual(len(rows), 4)
+            ids = {r["run_id"] for r in rows}
+            self.assertEqual(len(ids), 4, "并发下不能丢局或互相覆盖")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

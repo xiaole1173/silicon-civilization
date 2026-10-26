@@ -158,9 +158,10 @@ class CommonsPlugin(BaseScenario):
             declared = {}
             if cfg.get("declare", True):
                 card = session.open_round("公开声明", "第 {} 轮".format(rnd_no))
+                actions = self._act_many(session, sorted(session.agents), "declare",
+                                         "先当众说明这轮打算取用多少。", card["id"])
                 for seat in sorted(session.agents):
-                    action = self._act(session, seat, "declare", "先当众说明这轮打算取用多少。",
-                                      card["id"])
+                    action = actions.get(seat) or {"kind": "pass"}
                     if action.get("kind") == "declare":
                         try:
                             declared[seat] = float(action.get("amount"))
@@ -171,9 +172,10 @@ class CommonsPlugin(BaseScenario):
 
             card = session.open_round("取用", "第 {} 轮".format(rnd_no))
             taken = {}
+            actions = self._act_many(session, sorted(session.agents), "take",
+                                     "实际取用多少（0–{:g}）。".format(mx), card["id"])
             for seat in sorted(session.agents):
-                action = self._act(session, seat, "take", "实际取用多少（0–{:g}）。".format(mx),
-                                  card["id"])
+                action = actions.get(seat) or {"kind": "take", "amount": 0}
                 amount = action.get("amount")
                 try:
                     amount = max(0.0, min(mx, float(amount)))
@@ -217,6 +219,47 @@ class CommonsPlugin(BaseScenario):
         return dict(session.meta.get("collapse") or {})
 
     # ---------- 工具 ----------
+    def _act_many(self, session, seats, context: str, instruction: str, round_id: str = "") -> dict:
+        """同相位并行提问：所有人同时被问，结算仍按座位顺序。"""
+        cfg = self._cfg(session)
+        workers = int(cfg.get("parallel_asks", 6) or 6)
+        tag = ep.CONTEXT_TAG.get("commons_" + context, "")
+        schema = ep.SCHEMA_TEXT.get("commons_" + context, "")
+        jobs = []
+        for seat in seats:
+            prompt = "你是 {} 号。{}{}\n只输出一个 JSON 对象，不要解释。\n输出格式：{}".format(
+                seat, tag, instruction, schema)
+            jobs.append((session.agents[seat], prompt, {
+                "channel": PUBLIC, "kind": "speak",
+                "budget": BUDGET.get(context, 768),
+                "validator": self._validator(context), "retries": 1,
+                "label": "commons_" + context, "round_id": round_id,
+            }))
+        msgs = session.ask_many(jobs, max_workers=workers)
+        out = {}
+        for seat, msg in zip(seats, msgs):
+            action = ep.parse_action((msg.text if msg else "") or "")
+            if not action:
+                action = {"kind": "pass"}
+            if msg is not None:
+                try:
+                    shown = float(action.get("amount") or 0)
+                except (TypeError, ValueError):
+                    shown = 0.0
+                if context == "declare" and action.get("kind") == "declare":
+                    msg.text = "（打算取用 {:g}）".format(shown)
+                    msg.kind = "action"
+                elif context == "take":
+                    msg.text = "（取用 {:g}）".format(shown)
+                    msg.kind = "action"
+                msg.meta = dict(msg.meta or {})
+                msg.meta["action"] = action
+                msg.meta["role"] = "牧户"
+                msg.meta["seat"] = seat
+                session.patch_message(msg)
+            out[seat] = action
+        return out
+
     def _act(self, session, seat: int, context: str, instruction: str, round_id: str = "") -> dict:
         if session.stopped:
             return {"kind": "pass"}

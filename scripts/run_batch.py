@@ -81,6 +81,8 @@ def main():
     ap.add_argument("--rounds", type=int, default=1)
     ap.add_argument("--out", default="")
     ap.add_argument("--no-resume", action="store_true")
+    ap.add_argument("--concurrency", type=int, default=1,
+                    help="同时跑几局（受模型端限流影响，建议 1-3）")
     args = ap.parse_args()
 
     seats = resolve_seats(args.seats)
@@ -91,8 +93,8 @@ def main():
     sweep = parse_sweep(args.sweep)
     seeds = parse_seeds(args.seeds)
 
-    print("插件 {} | 座位 {} | seeds {} | 条件 {}".format(
-        args.plugin, len(seats), seeds, sweep or "（单条件）"))
+    print("插件 {} | 座位 {} | seeds {} | 条件 {} | 并发 {}".format(
+        args.plugin, len(seats), seeds, sweep or "（单条件）", args.concurrency))
 
     def progress(row, done, total):
         print("  [{}/{}] {} | {} | winner={} | {}s".format(
@@ -102,7 +104,8 @@ def main():
     summary = batch_mod.run_batch(
         args.plugin, seats=seats, base_config=base_config, sweep=sweep, seeds=seeds,
         title=args.plugin, out_root=args.out or None,
-        resume=not args.no_resume, on_progress=progress)
+        resume=not args.no_resume, concurrency=args.concurrency,
+        on_progress=progress)
     print("\n批次完成:", summary["batch_id"])
     print("  索引:", summary["index"])
     print("  清单:", summary["manifest"])
