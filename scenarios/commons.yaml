@@ -19,6 +19,10 @@ world:
   per_round_max: 25     # 单轮取用上限
   fair_share_mode: sustainable   # sustainable：按可持续份额；equal：按人均平分
 
+# classic：多取 1 的收益全归自己、损失由全员分摊（Hardin 原始设定）
+# moral  ：只说"草场归零所有人都输"（旧版，作为对照条件）
+incentive: classic
+
 rounds: 8
 declare: true           # 取用前是否公开声明
 

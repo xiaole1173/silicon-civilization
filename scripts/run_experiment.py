@@ -93,6 +93,8 @@ def main():
     ap.add_argument("--seeds", default="1-20")
     ap.add_argument("--seats", type=int, default=6)
     ap.add_argument("--concurrency", type=int, default=2)
+    ap.add_argument("--incentive", default="", choices=["", "classic", "moral"],
+                    help="公地激励设定：classic=收益私有+成本分摊，moral=只讲共同损失")
     ap.add_argument("--price-in", type=float, default=0.0)
     ap.add_argument("--price-out", type=float, default=0.0)
     ap.add_argument("--out", default="runs/experiments")
@@ -108,6 +110,8 @@ def main():
     base_cfg = {"scenario": plan["scenario"], "rounds": plan["rounds"]}
     if plan.get("per_round_max"):
         base_cfg["per_round_max"] = plan["per_round_max"]
+    if args.incentive:
+        base_cfg["incentive"] = args.incentive
     if args.price_in or args.price_out:
         base_cfg["price_in_per_m"] = args.price_in
         base_cfg["price_out_per_m"] = args.price_out
