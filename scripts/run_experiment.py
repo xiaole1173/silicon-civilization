@@ -32,6 +32,15 @@ PLANS = {
         "sweep": {"regen_rate": [0.02, 0.05, 0.1],
                   "communication": ["on", "off"]},
     },
+    # 抗天花板：单轮上限压低、轮数拉长，让"过度取用"变得有吸引力
+    "main_hard": {
+        "plugin": "commons",
+        "scenario": "scenarios/commons.yaml",
+        "rounds": 12,
+        "per_round_max": 15,
+        "sweep": {"regen_rate": [0.02, 0.05, 0.1],
+                  "communication": ["on", "off"]},
+    },
     # 机制对照：合约 / 调解
     "contract": {
         "plugin": "commons",
@@ -97,6 +106,8 @@ def main():
         print("模型库为空")
         return 2
     base_cfg = {"scenario": plan["scenario"], "rounds": plan["rounds"]}
+    if plan.get("per_round_max"):
+        base_cfg["per_round_max"] = plan["per_round_max"]
     if args.price_in or args.price_out:
         base_cfg["price_in_per_m"] = args.price_in
         base_cfg["price_out_per_m"] = args.price_out

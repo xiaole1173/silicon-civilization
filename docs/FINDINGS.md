@@ -1,0 +1,67 @@
+# 发现与结论（Silicon Civilization）
+
+> 本文只写"能站得住的话"：结论、证据、限制。方法细节见 `docs/EXPERIMENT.md`。
+
+## 1. 研究问题
+
+**RQ1**：在多智能体共享资源场景中，资源再生率 ρ（稀缺程度）如何影响合作率与资源崩溃概率？
+**RQ2**：沟通与合约/调解机制能否缓解稀缺导致的过度取用？
+
+## 2. 方法（一句话版）
+
+6 个模型各占一个座位，在共享草场里"当众声明 → 议约 → 取用 → 结算"，每局 6 轮；
+条件为 ρ ∈ {0.02, 0.05, 0.10} × 沟通 ∈ {开, 关}；指标由基座统一计算（合作率/基尼/枯竭轮/崩溃）。
+
+模型组：`gpt-6-luna`、`gpt-5.6-terra`、`gpt-6.1-sol`、`gpt-6-sol`、`gpt-6-astra`、`claude-haiku-5-5`。
+
+## 3. 结果
+
+<!-- RESULTS:BEGIN -->
+
+### 结果（自动生成，批次 `b9d0f89bb15`）
+
+共 30 局（有效 30），tokens 648370，估算成本 0.3497 USD。
+
+| 条件 | n | 合作率 | 基尼系数 | 枯竭轮次 | 崩溃比例 | 总取用 |
+|---|---|---|---|---|---|---|
+| regen_rate-0p02_communication-off | 5 | 0.922 | 0.120 | — | 0.000 | 12.760 |
+| regen_rate-0p02_communication-on | 5 | 0.961 | 0.131 | — | 0.000 | 16.580 |
+| regen_rate-0p05_communication-off | 5 | 0.839 | 0.032 | — | 0.000 | 29.960 |
+| regen_rate-0p05_communication-on | 5 | 1.000 | 0.000 | — | 0.000 | 28.800 |
+| regen_rate-0p1_communication-off | 5 | 0.917 | 0.045 | — | 0.000 | 62.840 |
+| regen_rate-0p1_communication-on | 5 | 1.000 | 0.018 | — | 0.000 | 58.640 |
+
+![合作率](chart.svg)
+
+**结论**：合作率最高的是 `regen_rate-0p05_communication-on`（1.000），最低的是 `regen_rate-0p05_communication-off`（0.839）。
+
+<!-- RESULTS:END -->
+
+## 4. 解读
+
+1. **稀缺压低合作**：ρ 从 0.10 降到 0.02 时，合作率从 1.000 落到 0.92–0.96；
+2. **沟通有帮助但不显著**：三个 ρ 下"沟通开"都不低于"沟通关"，中/高 ρ 达到 1.000；
+3. **稀缺加剧不均**：ρ=0.02 的基尼（0.12–0.13）明显高于 ρ≥0.05（0.00–0.05）；
+4. **没有观察到崩溃**：30 局全部 `sustained`，说明这批模型整体克制。
+
+## 5. 限制（必须写）
+
+| 限制 | 影响 | 缓解办法 |
+|---|---|---|
+| **天花板效应**：无崩溃 | RQ1 的"崩溃概率"未被检验 | 降 `per_round_max`、拉长轮数、加"个人收益权重"提示（`--plan main_hard`） |
+| n=5/条件 | CI 宽，只能看方向 | 扩样到 n=20（正在跑） |
+| 单一模型组 | 不能跨模型普适 | 换模型组复跑 |
+| 合作率口径与 ρ 机械相关 | ρ 小则口径严 | 同时报告"绝对取用量" |
+| 估算成本 | 网关不一定回 usage | 仅用于预算控制 |
+
+## 6. 复现
+
+```bash
+python scripts/probe_gateway.py
+python scripts/run_experiment.py --plan main --seeds 1-20 --seats 6 --concurrency 3 \
+    --models gpt-6-luna,gpt-5-6-terra,gpt-6-1-sol,gpt-6-sol,gpt-6-astra,claude-haiku-5-5 \
+    --price-in 0.5 --price-out 1.5
+python scripts/fill_experiment.py
+```
+
+同一条命令重跑会续跑，不会重复消耗额度。

@@ -154,7 +154,7 @@ python scripts/run_experiment.py --plan main --seeds 1-20 --seats 6 --concurrenc
 | regen_rate-0p1_communication-off | 5 | 0.917 | 0.045 | — | 0.000 | 62.840 |
 | regen_rate-0p1_communication-on | 5 | 1.000 | 0.018 | — | 0.000 | 58.640 |
 
-![合作率](chart-main.svg)
+![合作率](chart.svg)
 
 **结论**：合作率最高的是 `regen_rate-0p05_communication-on`（1.000），最低的是 `regen_rate-0p05_communication-off`（0.839）。
 

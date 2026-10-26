@@ -21,8 +21,8 @@
 | 页面令牌化 | 完成 | 四个页面 style 块硬编码色值 = 0 |
 | README / 截图 | 完成 | README 全量重写，docs 清理旧图 |
 | LLM judge | 完成 | `base/judge.py` + `scripts/run_judge.py`，6 项测试 |
-| 真模型批量验证 | **受阻** | 网关 429（ailab）/ 余额不足（modelscope） |
-| 正式实验 N=20-30 | **受阻** | 脚本与文档就绪，待额度 |
+| 真模型批量验证 | 完成 | 30 局 0 失败调用，648k tokens，$0.35（见 EXPERIMENT.md） |
+| 正式实验 | 进行中 | N=5/条件已完成；扩样到 N=20 在跑（批次 b9aa4b77277） |
 
 ## 测试
 

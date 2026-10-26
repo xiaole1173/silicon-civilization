@@ -135,6 +135,17 @@ def main():
         fh.write(doc)
     print("已写入", args.doc, "（批次", batch_id, "，", len(rows), "局）")
 
+    # 同步更新结论文档（如果存在）
+    findings = os.path.join(ROOT, "docs", "FINDINGS.md")
+    if os.path.exists(findings) and os.path.abspath(findings) != os.path.abspath(args.doc):
+        with open(findings, encoding="utf-8") as fh:
+            doc2 = fh.read()
+        if BEGIN in doc2 and END in doc2:
+            doc2 = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), section, doc2, flags=re.S)
+            with open(findings, "w", encoding="utf-8") as fh:
+                fh.write(doc2)
+            print("已同步", findings)
+
 
 if __name__ == "__main__":
     main()
