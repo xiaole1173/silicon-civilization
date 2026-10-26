@@ -44,7 +44,7 @@ class Agent:
 
 class Session:
     def __init__(self, session_id: str, title: str, scenario, config: dict | None = None,
-                 budget_chars: int = 12000):
+                 budget_chars: int = 12000, truncate_log: bool = True):
         self.id = session_id
         self.title = title
         self.scenario = scenario
@@ -70,7 +70,10 @@ class Session:
         self._log_lock = threading.Lock()
         self.log_path = ROOT / "runs" / "sessions" / (session_id + ".jsonl")
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        self.log_path.write_text("", encoding="utf-8")
+        if truncate_log:
+            self.log_path.write_text("", encoding="utf-8")
+        else:
+            self.log_path.touch(exist_ok=True)
 
     def alive_ids(self) -> list:
         """在场座位（默认全员）。带死亡机制的场景应在 meta["alive"] 里维护。"""
@@ -132,6 +135,15 @@ class Session:
             return
         rnd["summary"] = summary
         self._publish({"type": "round_end", "round": rnd["id"], "summary": summary})
+        self.checkpoint()
+
+    def checkpoint(self) -> None:
+        """把会话快照落盘（回合边界调用），用于重启后恢复/续跑。"""
+        try:
+            from base import persistence
+            persistence.save(self)
+        except Exception:
+            pass
 
     def referee(self, text: str, public: bool = True) -> Message:
         """裁判发言：由确定性程序发出，负责串起整局的节奏。"""

@@ -698,6 +698,7 @@ function loadSessions(){
         '<div class="s">' + esc(s.scenario) + ' · ' + s.messages + ' 条 · ' + esc(stateText(s.state)) +
         '</div></button>' +
         (live ? '<button class="stopbtn" data-stop="' + esc(s.id) + '" title="结束这局">结束</button>' : '') +
+        (s.state === "paused" ? '<button class="stopbtn" data-resume="' + esc(s.id) + '" title="从那一步继续">继续</button>' : '') +
         '</div>';
     }).join("") : '<div class="hint">还没有会话</div>';
   });
@@ -792,6 +793,17 @@ $("replayList").onclick = function(ev){
   loadSessions();
 };
 $("sessList").onclick = function(ev){
+  var resume = ev.target.closest ? ev.target.closest("[data-resume]") : null;
+  if (resume){
+    var rid = resume.getAttribute("data-resume");
+    banner("正在从快照续跑…");
+    api("/api/sessions/" + encodeURIComponent(rid) + "/resume", { method: "POST" })
+      .then(function(d){
+        if (!d.ok){ banner("续跑失败：这一局不是暂停状态。"); return; }
+        attach(rid);
+      });
+    return;
+  }
   var stop = ev.target.closest ? ev.target.closest("[data-stop]") : null;
   if (stop){
     var sid = stop.getAttribute("data-stop");

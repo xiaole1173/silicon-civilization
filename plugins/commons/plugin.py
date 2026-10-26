@@ -148,7 +148,11 @@ class CommonsPlugin(BaseScenario):
         last_round = 0
         penalties = {}
 
-        for rnd_no in range(1, rounds + 1):
+        start_round = 1
+        if session.meta.get("resumed"):
+            start_round = int(session.meta.get("turn", 0)) + 1
+            session.referee("从第 {} 轮继续。".format(start_round))
+        for rnd_no in range(start_round, rounds + 1):
             if session.stopped:
                 break
             last_round = rnd_no

@@ -35,6 +35,8 @@ class Resource:
     def scarcity(self) -> float:
         return 0.0 if self.cap <= 0 else max(0.0, self.amount / self.cap)
 
+
+
     def snapshot(self) -> dict:
         return {"name": self.name, "amount": round(self.amount, 3),
                 "cap": self.cap, "regen_rate": self.regen_rate,
@@ -100,6 +102,22 @@ class World:
 
     def round_events(self, round_no: int) -> list[dict]:
         return [e for e in self.events if e["round"] == round_no]
+
+    @classmethod
+    def from_snapshot(cls, data: dict) -> "World":
+        """从快照重建（用于重启后续跑）。"""
+        resources = {}
+        for name, r in (data.get("resources") or {}).items():
+            resources[name] = Resource(name=r.get("name", name),
+                                       amount=float(r.get("amount", 0)),
+                                       cap=float(r.get("cap", 100)),
+                                       regen_rate=float(r.get("regen_rate", 0.05)),
+                                       unit=r.get("unit", "单位"))
+        w = cls(resources=resources, agents=[int(a) for a in (data.get("agents") or [])])
+        for seat, vals in (data.get("ledger") or {}).items():
+            w.ledger[int(seat)] = {k: float(v) for k, v in (vals or {}).items()}
+        w.history = list(data.get("history") or [])
+        return w
 
     def snapshot(self) -> dict:
         return {"resources": {n: r.snapshot() for n, r in self.resources.items()},

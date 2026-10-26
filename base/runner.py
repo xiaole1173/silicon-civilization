@@ -30,7 +30,35 @@ def create_session(session_id: str, plugin, config: dict, seats: list, title: st
     return session
 
 
+_LOADED = False
+
+
+def _ensure_loaded() -> None:
+    """服务启动后首次访问时，从快照恢复历史对局（只读/可续跑）。"""
+    global _LOADED
+    if _LOADED:
+        return
+    _LOADED = True
+    try:
+        import base.persistence as persistence
+        import base.plugin as plugin_mod
+        for data in persistence.load_all():
+            sid = data.get("id")
+            if not sid or sid in _SESSIONS:
+                continue
+            plugin = plugin_mod.get_plugin(data.get("scenario") or "")
+            if plugin is None:
+                continue
+            try:
+                _SESSIONS[sid] = persistence.restore(data, plugin)
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+
 def get_session(session_id: str) -> Session | None:
+    _ensure_loaded()
     with _LOCK:
         return _SESSIONS.get(session_id)
 
@@ -43,7 +71,19 @@ def stop_session(session_id: str, reason: str = "") -> bool:
     return True
 
 
+def resume_session(session_id: str) -> bool:
+    """从快照继续跑（仅支持插件实现了 resume 语义的场景，如公地）。"""
+    sess = get_session(session_id)
+    if sess is None or sess.state != "paused":
+        return False
+    sess.meta["resumed"] = True
+    sess.state = "running"
+    start(sess, skip_setup=True)
+    return True
+
+
 def list_sessions() -> list:
+    _ensure_loaded()
     with _LOCK:
         items = list(_SESSIONS.values())
     return [{"id": s.id, "title": s.title, "state": s.state,
@@ -51,12 +91,13 @@ def list_sessions() -> list:
              "scenario": getattr(s.scenario, "id", "")} for s in items]
 
 
-def start(session: Session, on_error=None) -> threading.Thread:
+def start(session: Session, on_error=None, skip_setup: bool = False) -> threading.Thread:
     def _run():
         session.state = "running"
         session._publish({"type": "session", "state": "running", "id": session.id})
         try:
-            session.scenario.setup(session)
+            if not skip_setup:
+                session.scenario.setup(session)
             session.scenario.run(session)
         except Exception as exc:  # pragma: no cover
             traceback.print_exc()
