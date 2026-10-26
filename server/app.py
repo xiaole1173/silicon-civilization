@@ -23,12 +23,14 @@ import mimetypes
 import os
 import queue
 import sys
+import threading
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+batch_progress = {}
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT))
 
@@ -144,6 +146,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True, "plugins": plugin_mod.list_plugins()})
         if path == "/api/sessions":
             return self._json(200, {"ok": True, "sessions": runner_mod.list_sessions()})
+        if path == "/api/batches":
+            return self._list_batches()
+        if path.startswith("/api/batches/"):
+            rest = path[len("/api/batches/"):].strip("/")
+            bid, _, tail = rest.partition("/")
+            if tail == "chart":
+                return self._batch_file(bid, "chart.svg", "image/svg+xml")
+            return self._batch_detail(bid)
         if path == "/api/replay":
             return self._json(200, {"ok": True, "logs": self._list_session_logs()})
         parts = [p for p in path.split("/") if p]
@@ -295,6 +305,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._tts()
         if path == "/api/sessions":
             return self._create_session()
+        if path == "/api/batches":
+            return self._start_batch()
         parts = [p for p in path.split("/") if p]
         if len(parts) == 4 and parts[1] == "sessions" and parts[3] == "resume":
             ok = runner_mod.resume_session(parts[2])
@@ -307,6 +319,169 @@ class Handler(BaseHTTPRequestHandler):
                 return self._error(404, "会话不存在")
             return self._json(200, {"ok": True, "stopped": parts[2]})
         return self._error(404, "未知接口")
+
+    # ---------- 批次 ----------
+    def _batches_dir(self):
+        return ROOT / "runs" / "batches"
+
+    def _list_batches(self):
+        base = self._batches_dir()
+        items = []
+        if base.is_dir():
+            dirs = sorted(base.glob("*/"), key=lambda d: d.stat().st_mtime, reverse=True)
+            for d in dirs[:60]:
+                summary_path = d / "summary.json"
+                info = {"id": d.name, "mtime": int(d.stat().st_mtime)}
+                if summary_path.exists():
+                    try:
+                        with summary_path.open(encoding="utf-8") as fh:
+                            data = json.load(fh)
+                        info.update({"runs": data.get("runs"), "executed": data.get("executed"),
+                                     "errors": len(data.get("errors") or []),
+                                     "concurrency": data.get("concurrency"),
+                                     "has_report": bool(data.get("report"))})
+                    except Exception:
+                        pass
+                items.append(info)
+        return self._json(200, {"ok": True, "batches": items,
+                                "progress": dict(batch_progress)})
+
+    def _batch_detail(self, bid: str):
+        d = self._batches_dir() / bid
+        if not d.is_dir():
+            return self._error(404, "批次不存在")
+        out = {"ok": True, "id": bid, "rows": [], "report": "", "summary": {}}
+        sp = d / "summary.json"
+        if sp.exists():
+            try:
+                with sp.open(encoding="utf-8") as fh:
+                    out["summary"] = json.load(fh)
+            except Exception:
+                pass
+        idx = d / "index.csv"
+        if idx.exists():
+            try:
+                import csv
+                with idx.open(encoding="utf-8-sig") as fh:
+                    out["rows"] = [dict(r) for r in csv.DictReader(fh)]
+            except Exception:
+                pass
+        rp = d / "REPORT.md"
+        if rp.exists():
+            try:
+                out["report"] = rp.read_text(encoding="utf-8")
+            except Exception:
+                pass
+        out["has_chart"] = (d / "chart.svg").exists()
+        return self._json(200, out)
+
+    def _batch_file(self, bid: str, name: str, ctype: str):
+        d = self._batches_dir() / bid
+        p = d / name
+        if not p.exists():
+            return self._error(404, "文件不存在")
+        try:
+            data = p.read_bytes()
+        except Exception as exc:
+            return self._error(500, repr(exc))
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        try:
+            self.wfile.write(data)
+        except Exception:
+            pass
+
+    def _start_batch(self):
+        body = self._body()
+        plugin_id = str(body.get("plugin") or "commons")
+        seeds = body.get("seeds") or "1-3"
+        sweep = body.get("sweep") or ""
+        concurrency = int(body.get("concurrency") or 1)
+        models = int(body.get("models") or 6)
+        scenario = str(body.get("scenario") or "")
+        rounds = int(body.get("rounds") or 0)
+
+        forced = str(body.get("seat_model") or "").strip()
+        if forced:
+            ids = [forced] * int(models)
+        else:
+            ids = [m["id"] for m in store.list_models() if m["id"] != "model-d3cf3bfe"]
+        if not ids:
+            return self._error(400, "模型库为空")
+        seats = []
+        for i, mid in enumerate(ids[:models], start=1):
+            conf = store.get_model(mid, with_secret=True)
+            if not conf:
+                return self._error(400, "模型不存在：" + mid)
+            seats.append({"name": "{}号".format(i), "model_conf": conf})
+
+        def parse_seeds(text):
+            out = []
+            for part in str(text).split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                if "-" in part:
+                    a, b = part.split("-", 1)
+                    out.extend(range(int(a), int(b) + 1))
+                else:
+                    out.append(int(part))
+            return out
+
+        def parse_sweep(text):
+            sw = {}
+            for chunk in str(text or "").split(";"):
+                chunk = chunk.strip()
+                if not chunk:
+                    continue
+                k, _, vals = chunk.partition("=")
+                items = []
+                for v in vals.split(","):
+                    v = v.strip()
+                    if not v:
+                        continue
+                    try:
+                        items.append(int(v))
+                    except ValueError:
+                        try:
+                            items.append(float(v))
+                        except ValueError:
+                            items.append(v)
+                sw[k.strip()] = items
+            return sw
+
+        base_cfg = {}
+        if scenario:
+            base_cfg["scenario"] = scenario
+        if rounds:
+            base_cfg["rounds"] = rounds
+
+        def worker():
+            import base.batch as batch_mod
+            batch_progress["state"] = "running"
+            batch_progress["started"] = time.time()
+
+            def progress(row, done, total):
+                batch_progress.update({"done": done, "total": total,
+                                       "last": row.get("run_id"),
+                                       "state_run": row.get("state")})
+
+            try:
+                result = batch_mod.run_batch(
+                    plugin_id, seats=seats, base_config=base_cfg,
+                    sweep=parse_sweep(sweep), seeds=parse_seeds(seeds),
+                    concurrency=concurrency, on_progress=progress)
+                batch_progress.update({"state": "done", "batch_id": result.get("batch_id"),
+                                       "report": result.get("report")})
+            except Exception as exc:
+                batch_progress.update({"state": "error", "error": repr(exc)[:200]})
+
+        batch_progress.update({"state": "starting", "done": 0, "total": 0, "error": ""})
+        threading.Thread(target=worker, daemon=True).start()
+        return self._json(202, {"ok": True, "started": True,
+                                "plugin": plugin_id, "seats": len(seats)})
 
     # ---------- 基座：会话 ----------
     def _list_session_logs(self):

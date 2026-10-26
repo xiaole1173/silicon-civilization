@@ -16,6 +16,7 @@
     ["会话台", "chat.html"],
     ["模型管理", "models.html"],
     ["狼人杀观察台", "werewolf.html"],
+    ["实验批次", "batches.html"],
     ["回放台", "../viz/index.html"]
   ];
 

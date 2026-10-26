@@ -247,7 +247,8 @@ class CommonsPlugin(BaseScenario):
                 session.referee("草场见底了。这一轮之后再没有草可以割。")
                 break
 
-        survived = 0 if collapsed else last_round
+        # 崩溃也算"撑到了第 N 轮"，只是没能保住草场
+        survived = last_round
         session.referee("对局结束：{}（撑过 {} 轮，期末存量 {:g}{}）。".format(
             "草场崩溃" if collapsed else "草场保住", survived, res.amount, res.unit))
         session.meta["contracts"] = session.contracts.to_dict()

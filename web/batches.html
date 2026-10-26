@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>实验批次</title>
+<link rel="stylesheet" href="theme.css">
+<script src="theme.js" defer></script>
+<style>
+  html,body{height:100%;overflow:hidden}
+  main{display:grid;grid-template-columns:240px minmax(0,1fr);height:calc(100vh - 56px);overflow:hidden}
+  #left{border-right:1px solid var(--outline);background:var(--surface);padding:var(--sp-4);overflow:auto}
+  #right{overflow:auto;padding:var(--sp-4) var(--sp-5)}
+  h2{font-size:var(--fs-12);color:var(--on-surface-mid);font-weight:600;margin:0 0 var(--sp-2)}
+  .bat{display:block;width:100%;text-align:left;border:1px solid transparent;border-radius:var(--r-sm);
+    padding:7px 9px;margin-bottom:4px;background:transparent;cursor:pointer}
+  .bat:hover{background:var(--surface-3)}
+  .bat.on{background:var(--brand-weak);border-color:var(--outline)}
+  .bat .t{font-size:var(--fs-13);font-weight:600;font-family:var(--font-mono)}
+  .bat .s{font-size:var(--fs-12);color:var(--on-surface-low)}
+  .card{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r-md);
+    box-shadow:var(--e1);padding:var(--sp-4);margin-bottom:var(--sp-4)}
+  .form{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3);align-items:end}
+  .kv{display:flex;justify-content:space-between;font-size:var(--fs-13);padding:3px 0;color:var(--on-surface-mid)}
+  .kv b{color:var(--on-surface)}
+  pre{background:var(--surface-2);border:1px solid var(--outline);border-radius:var(--r-sm);
+    padding:var(--sp-3);font-size:var(--fs-12);overflow:auto;max-height:420px;white-space:pre-wrap}
+  table{width:100%;border-collapse:collapse;font-size:var(--fs-12)}
+  th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--outline);white-space:nowrap}
+  th{color:var(--on-surface-mid);font-weight:600}
+  .scroll{overflow:auto;max-height:320px}
+  .empty{font-size:var(--fs-12);color:var(--on-surface-low);padding:var(--sp-3) 0}
+  .bar{height:6px;background:var(--surface-3);border-radius:var(--r-pill);overflow:hidden;margin-top:6px}
+  .bar i{display:block;height:100%;background:var(--brand);width:0}
+</style>
+</head>
+<body>
+<header>
+  <h1>实验批次</h1>
+  <span class="pill">进度 <b id="prog">—</b></span>
+</header>
+<main>
+  <aside id="left">
+    <h2>批次</h2>
+    <div id="list"><div class="empty">还没有批次</div></div>
+  </aside>
+  <section id="right">
+    <div class="card">
+      <h2>新建批次</h2>
+      <div class="form">
+        <div><label>插件</label><select id="plugin"></select></div>
+        <div><label>seeds</label><input id="seeds" value="1-3"></div>
+        <div><label>sweep（如 regen_rate=0.02,0.05）</label><input id="sweep" value="regen_rate=0.02,0.05"></div>
+        <div><label>并发</label><input id="conc" type="number" value="2" min="1" max="8"></div>
+        <div><label>座位数</label><input id="models" type="number" value="6" min="2" max="12"></div>
+        <div><label>场景（可选）</label><input id="scenario" value="scenarios/commons.yaml"></div>
+        <div><label>轮数（可选）</label><input id="rounds" type="number" value="4"></div>
+        <div><button class="primary" id="start">启动</button></div>
+      </div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="empty" id="hint" style="padding-top:8px">切换种子与参数后点启动；同条件重跑会自动续跑。</div>
+    </div>
+    <div id="detail"><div class="empty">选择左侧一个批次查看结果。</div></div>
+  </section>
+</main>
+<script>
+var S = {list: [], cur: null, timer: null};
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function api(u, opt){ return fetch(u, opt).then(function(r){ return r.json(); }); }
+
+function loadPlugins(){
+  return api("/api/plugins").then(function(d){
+    $("plugin").innerHTML = (d.plugins || []).map(function(p){
+      return '<option value="' + esc(p.id) + '">' + esc(p.name) + "</option>";
+    }).join("");
+  });
+}
+
+function loadList(){
+  return api("/api/batches").then(function(d){
+    S.list = d.batches || [];
+    var p = d.progress || {};
+    if (p.total){
+      $("prog").textContent = p.done + " / " + p.total + "（" + (p.state_run || "") + "）";
+      $("bar").style.width = Math.round(100 * p.done / p.total) + "%";
+    } else if (p.state === "done"){
+      $("prog").textContent = "完成";
+      $("bar").style.width = "100%";
+    }
+    $("list").innerHTML = S.list.length ? S.list.map(function(b){
+      return '<button class="bat' + (S.cur === b.id ? " on" : "") + '" data-id="' + esc(b.id) + '">' +
+        '<div class="t">' + esc(b.id) + '</div>' +
+        '<div class="s">' + (b.runs || 0) + " 局 · " + (b.executed || 0) + " 完成" +
+        (b.errors ? " · " + b.errors + " 错误" : "") + "</div></button>";
+    }).join("") : '<div class="empty">还没有批次</div>';
+  });
+}
+
+function show(id){
+  S.cur = id;
+  return api("/api/batches/" + encodeURIComponent(id)).then(function(d){
+    if (!d.ok){ $("detail").innerHTML = '<div class="empty">批次不存在</div>'; return; }
+    var rows = d.rows || [];
+    var cols = rows.length ? Object.keys(rows[0]).slice(0, 10) : [];
+    var table = rows.length ?
+      '<div class="scroll"><table><thead><tr>' + cols.map(function(c){ return "<th>" + esc(c) + "</th>"; }).join("") +
+      "</tr></thead><tbody>" + rows.map(function(r){
+        return "<tr>" + cols.map(function(c){ return "<td>" + esc(r[c]) + "</td>"; }).join("") + "</tr>";
+      }).join("") + "</tbody></table></div>" : '<div class="empty">没有数据行</div>';
+    var chart = d.has_chart ? '<img src="/api/batches/' + encodeURIComponent(id) + '/chart" style="max-width:100%;margin-top:12px">' : "";
+    $("detail").innerHTML =
+      '<div class="card"><h2>批次 ' + esc(id) + '</h2>' + table + chart + "</div>" +
+      (d.report ? '<div class="card"><h2>报告</h2><pre>' + esc(d.report) + "</pre></div>" : "");
+    loadList();
+  });
+}
+
+function start(){
+  var body = {
+    plugin: $("plugin").value,
+    seeds: $("seeds").value,
+    sweep: $("sweep").value,
+    concurrency: Number($("conc").value || 1),
+    models: Number($("models").value || 6),
+    scenario: $("scenario").value,
+    rounds: Number($("rounds").value || 0)
+  };
+  $("hint").textContent = "已提交，正在后台运行…";
+  api("/api/batches", { method: "POST", headers: {"Content-Type":"application/json"},
+                        body: JSON.stringify(body) })
+    .then(function(d){
+      if (!d.ok){ $("hint").textContent = "启动失败：" + (d.error || ""); return; }
+      $("hint").textContent = "已启动（" + d.seats + " 个座位）";
+      poll();
+    });
+}
+
+function poll(){
+  if (S.timer) clearInterval(S.timer);
+  S.timer = setInterval(function(){ loadList(); }, 1500);
+}
+
+$("start").onclick = start;
+$("list").onclick = function(ev){
+  var t = ev.target.closest ? ev.target.closest("[data-id]") : null;
+  if (t) show(t.getAttribute("data-id"));
+};
+loadPlugins().then(loadList).then(function(){ if (S.list.length) show(S.list[0].id); });
+</script>
+</body>
+</html>
