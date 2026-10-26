@@ -17,7 +17,8 @@ from base.plugin import BaseScenario                # noqa: E402
 from base.world import Resource, World              # noqa: E402
 from engine import prompts as ep                     # noqa: E402
 
-BUDGET = {"declare": 768, "take": 768, "speak": 1024}
+# 推理模型的思考也占额度：给足，否则正文为空
+BUDGET = {"declare": 2048, "take": 2048, "propose": 2048, "accept": 1536, "speak": 2048}
 
 
 class CommonsPlugin(BaseScenario):

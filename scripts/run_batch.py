@@ -89,7 +89,9 @@ def main():
     if not seats:
         print("模型库为空，先在模型管理页添加模型")
         return 2
-    base_config = {"scenario": args.scenario, "rounds_per_day": args.rounds}
+    # 不同插件用不同键：狼人杀看 rounds_per_day，公地/规则怪谈看 rounds
+    base_config = {"scenario": args.scenario, "rounds_per_day": args.rounds,
+                   "rounds": args.rounds}
     sweep = parse_sweep(args.sweep)
     seeds = parse_seeds(args.seeds)
 
@@ -117,8 +119,18 @@ def main():
     # 聚合
     import csv
     rows = list(csv.DictReader(open(summary["index"], encoding="utf-8-sig")))
-    numeric = [k for k in (rows[0].keys() if rows else [])
-               if k.startswith("m_") or k == "duration_s"]
+    def _is_num(key):
+        if key == "duration_s":
+            return True
+        if not key.startswith("m_"):
+            return False
+        try:
+            float(rows[0].get(key))
+            return True
+        except (TypeError, ValueError):
+            return False
+
+    numeric = [k for k in (rows[0].keys() if rows else []) if _is_num(k)]
     agg = metrics_mod.aggregate(rows, numeric)
     print("\n聚合（n={}）:".format(agg["n"]))
     for k in numeric:

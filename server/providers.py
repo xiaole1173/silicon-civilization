@@ -214,6 +214,17 @@ def _http_error_text(status: int, body: str) -> str:
     return hint + ("；详情：" + snippet if snippet else "")
 
 
+def _guard_body(raw) -> None:
+    """网关有时返回登录页/HTML：直接报清楚，别让上层当成"空回答"。"""
+    try:
+        head = (raw or b"")[:200] if isinstance(raw, (bytes, bytearray)) else str(raw)[:200].encode()
+        text = head.decode("utf-8", "ignore").lstrip().lower()
+    except Exception:
+        return
+    if text.startswith("<!doctype html") or text.startswith("<html"):
+        raise ProviderError("网关返回的是网页（可能需要登录/VPN），不是模型响应")
+
+
 def call_chat(conf: dict, messages: list, *, resolution: dict | None = None,
               max_tokens: int | None = None, temperature: float | None = None,
               timeout: float = 60.0, extra_body: dict | None = None,
