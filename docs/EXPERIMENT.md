@@ -215,3 +215,19 @@ python scripts/probe_gateway.py
 python scripts/run_experiment.py --plan main --seeds 1-5 --incentive classic --concurrency 3 \
     --models gpt-6-luna,gpt-5-6-terra,gpt-6-1-sol,gpt-6-sol,gpt-6-astra,claude-haiku-5-5
 ```
+
+## 13. 运行纪律（用户硬性要求，2026-10-28）
+
+**未经用户允许，不得发起大规模并发测试。** 已做成代码闸门，而不是靠自觉：
+
+| 入口 | 默认 | 并发条件 |
+|---|---|---|
+| `scripts/run_experiment.py` | `--concurrency 1` | >1 必须同时加 `--allow-parallel` |
+| `scripts/run_batch.py` | `--concurrency 1` | 同上 |
+| `POST /api/batches` | `concurrency` 缺省 1 | >1 需 body 带 `allow_parallel: true`，否则 400 |
+| `/web/batches.html` | 输入框默认 1 | 需手动勾选「授权并发」 |
+
+闸门实现见 `base/batch.py::check_concurrency`，测试见 `tests/test_concurrency_gate.py`。
+
+代价说明：此前两次并发批次都出了问题——`b358babf980`（12 局）有 6 局被网关限流打断，
+`b5a409fe304`（30 局）因额度耗尽整体作废。两者均已移入 `runs/experiments_archive/`。

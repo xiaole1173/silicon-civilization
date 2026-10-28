@@ -414,7 +414,12 @@ class Handler(BaseHTTPRequestHandler):
         plugin_id = str(body.get("plugin") or "commons")
         seeds = body.get("seeds") or "1-3"
         sweep = body.get("sweep") or ""
-        concurrency = int(body.get("concurrency") or 1)
+        import base.batch as batch_mod
+        try:
+            concurrency = batch_mod.check_concurrency(
+                body.get("concurrency"), bool(body.get("allow_parallel")))
+        except ValueError as exc:
+            return self._error(400, str(exc))
         models = int(body.get("models") or 6)
         scenario = str(body.get("scenario") or "")
         rounds = int(body.get("rounds") or 0)

@@ -51,7 +51,9 @@
         <div><label>插件</label><select id="plugin"></select></div>
         <div><label>seeds</label><input id="seeds" value="1-3"></div>
         <div><label>sweep（如 regen_rate=0.02,0.05）</label><input id="sweep" value="regen_rate=0.02,0.05"></div>
-        <div><label>并发</label><input id="conc" type="number" value="2" min="1" max="8"></div>
+        <div><label>并发（默认串行）</label><input id="conc" type="number" value="1" min="1" max="8">
+          <label style="font-size:12px;display:flex;gap:6px;align-items:center;margin-top:4px">
+            <input id="allowPar" type="checkbox" style="width:auto"> 授权并发</label></div>
         <div><label>座位数</label><input id="models" type="number" value="6" min="2" max="12"></div>
         <div><label>场景（可选）</label><input id="scenario" value="scenarios/commons.yaml"></div>
         <div><label>轮数（可选）</label><input id="rounds" type="number" value="4"></div>
@@ -123,6 +125,7 @@ function start(){
     seeds: $("seeds").value,
     sweep: $("sweep").value,
     concurrency: Number($("conc").value || 1),
+    allow_parallel: $("allowPar").checked,
     models: Number($("models").value || 6),
     scenario: $("scenario").value,
     rounds: Number($("rounds").value || 0)

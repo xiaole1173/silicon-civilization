@@ -82,7 +82,9 @@ def main():
     ap.add_argument("--out", default="")
     ap.add_argument("--no-resume", action="store_true")
     ap.add_argument("--concurrency", type=int, default=1,
-                    help="同时跑几局（受模型端限流影响，建议 1-3）")
+                    help="同时跑几局；默认 1（串行）。>1 必须同时给 --allow-parallel")
+    ap.add_argument("--allow-parallel", action="store_true",
+                    help="显式授权并发（未经允许不要用）")
     args = ap.parse_args()
 
     seats = resolve_seats(args.seats)
@@ -92,11 +94,16 @@ def main():
     # 不同插件用不同键：狼人杀看 rounds_per_day，公地/规则怪谈看 rounds
     base_config = {"scenario": args.scenario, "rounds_per_day": args.rounds,
                    "rounds": args.rounds}
+    try:
+        concurrency = batch_mod.check_concurrency(args.concurrency, args.allow_parallel)
+    except ValueError as exc:
+        print(str(exc))
+        return 2
     sweep = parse_sweep(args.sweep)
     seeds = parse_seeds(args.seeds)
 
     print("插件 {} | 座位 {} | seeds {} | 条件 {} | 并发 {}".format(
-        args.plugin, len(seats), seeds, sweep or "（单条件）", args.concurrency))
+        args.plugin, len(seats), seeds, sweep or "（单条件）", concurrency))
 
     def progress(row, done, total):
         print("  [{}/{}] {} | {} | winner={} | {}s".format(
@@ -106,7 +113,7 @@ def main():
     summary = batch_mod.run_batch(
         args.plugin, seats=seats, base_config=base_config, sweep=sweep, seeds=seeds,
         title=args.plugin, out_root=args.out or None,
-        resume=not args.no_resume, concurrency=args.concurrency,
+        resume=not args.no_resume, concurrency=concurrency,
         on_progress=progress)
     print("\n批次完成:", summary["batch_id"])
     print("  索引:", summary["index"])

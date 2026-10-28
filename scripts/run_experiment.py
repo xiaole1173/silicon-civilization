@@ -92,7 +92,10 @@ def main():
     ap.add_argument("--plan", default="main", choices=sorted(PLANS))
     ap.add_argument("--seeds", default="1-20")
     ap.add_argument("--seats", type=int, default=6)
-    ap.add_argument("--concurrency", type=int, default=2)
+    ap.add_argument("--concurrency", type=int, default=1,
+                    help="同时跑几局；默认 1（串行）。>1 必须同时给 --allow-parallel")
+    ap.add_argument("--allow-parallel", action="store_true",
+                    help="显式授权并发（未经允许不要用：可能触发限流与费用）")
     ap.add_argument("--incentive", default="", choices=["", "classic", "moral"],
                     help="公地激励设定：classic=收益私有+成本分摊，moral=只讲共同损失")
     ap.add_argument("--price-in", type=float, default=0.0)
@@ -116,12 +119,17 @@ def main():
         base_cfg["price_in_per_m"] = args.price_in
         base_cfg["price_out_per_m"] = args.price_out
 
+    try:
+        concurrency = batch_mod.check_concurrency(args.concurrency, args.allow_parallel)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+
     seeds = parse_seeds(args.seeds)
     total = len(seeds)
     for k, v in plan["sweep"].items():
         total *= len(v)
     print("计划 {} | 插件 {} | 座位 {} | seeds {} | 共 {} 局 | 并发 {}".format(
-        args.plan, plan["plugin"], len(seats), args.seeds, total, args.concurrency))
+        args.plan, plan["plugin"], len(seats), args.seeds, total, concurrency))
 
     def progress(row, done, total_runs):
         print("  [{}/{}] {} | {} | {}s".format(done, total_runs, row["run_id"][-28:],
@@ -130,7 +138,7 @@ def main():
     summary = batch_mod.run_batch(
         plan["plugin"], seats=seats, base_config=base_cfg,
         sweep=plan["sweep"], seeds=seeds, out_root=args.out,
-        concurrency=args.concurrency, on_progress=progress)
+        concurrency=concurrency, on_progress=progress)
 
     print("\n批次:", summary["batch_id"])
     print("  索引:", summary["index"])

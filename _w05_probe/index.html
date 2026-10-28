@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>probe</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0d12;overflow:hidden}
+  #c{display:block;width:100vw;height:100vh}
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three';
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight, false);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0d12);
+scene.fog = new THREE.Fog(0x0b0d12, 8, 22);
+
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(4.2, 3.4, 5.6);
+camera.lookAt(0, 0, 0);
+
+scene.add(new THREE.AmbientLight(0x445566, 1.4));
+const key = new THREE.DirectionalLight(0xffe2b0, 3.2);
+key.position.set(5, 8, 4);
+scene.add(key);
+const rim = new THREE.PointLight(0x4da6ff, 18, 14, 2);
+rim.position.set(-4, 1.5, -3);
+scene.add(rim);
+
+// 立方体 + 两个面上各一段"场景切片"
+const box = new THREE.Group();
+const body = new THREE.Mesh(
+  new THREE.BoxGeometry(3, 3, 3),
+  new THREE.MeshStandardMaterial({ color: 0x2a3140, roughness: 0.85, metalness: 0.1 })
+);
+box.add(body);
+
+function faceScene(normal) {
+  const g = new THREE.Group();
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.8, 2.8),
+    new THREE.MeshStandardMaterial({ color: 0x141922, roughness: 1 })
+  );
+  g.add(plane);
+  for (let i = 0; i < 4; i++) {
+    const pillar = new THREE.Mesh(
+      new THREE.BoxGeometry(0.28, 1.6, 0.28),
+      new THREE.MeshStandardMaterial({ color: 0x8a6b3f, roughness: 0.7 })
+    );
+    pillar.position.set(-1.0 + i * 0.66, -0.2, 0.16);
+    g.add(pillar);
+  }
+  const glow = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.5, 0.06),
+    new THREE.MeshBasicMaterial({ color: 0xffc46b })
+  );
+  glow.position.set(0, -0.75, 0.18);
+  g.add(glow);
+  g.position.copy(normal.clone().multiplyScalar(1.5));
+  g.lookAt(g.position.clone().add(normal));
+  return g;
+}
+
+box.add(faceScene(new THREE.Vector3(0, 0, 1)));
+box.add(faceScene(new THREE.Vector3(1, 0, 0)));
+scene.add(box);
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+let t0 = performance.now();
+function frame(now) {
+  const t = (now - t0) / 1000;
+  box.rotation.y = -0.6 + Math.sin(t * 0.5) * 0.28;
+  box.rotation.x = 0.12;
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.__ok = renderer.info.render.triangles;
+</script>
+</body>
+</html>

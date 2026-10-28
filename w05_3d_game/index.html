@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>错层 · SEAM</title>
+<link rel="stylesheet" href="./styles.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="vignette"></div>
+
+<div id="hud">
+  <div id="objective"><span class="dot"></span>把两条轨道对上</div>
+  <div id="progress">0 / 1</div>
+</div>
+
+<div id="hint">拖动空白处 转动盒子　·　拖动轨道 升降</div>
+
+<div id="audio-panel">
+  <button id="mute" title="静音">声音 开</button>
+  <input id="volume" type="range" min="0" max="100" value="70" aria-label="音量">
+</div>
+
+<div id="narration"></div>
+
+<div id="overlay">
+  <div class="card">
+    <h1>错层</h1>
+    <p class="sub">一个盒子里的走廊。<br>两条轨道对上时，它才肯让你过去。</p>
+    <div class="row">
+      <button id="start" class="primary">开始</button>
+      <button id="watch">观看演示</button>
+    </div>
+    <p class="fine">这是一段可玩原型：转动盒子、拖动两条轨道，让它们在拐角处接上。</p>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

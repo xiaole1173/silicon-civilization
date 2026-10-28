@@ -31,6 +31,25 @@ class RunSpec:
         return dict(self.condition)
 
 
+def check_concurrency(value, allow_parallel: bool = False) -> int:
+    """并发闸门：没有显式授权时，最多只允许 1 局同时跑。
+
+    用户在 2026-10-28 明确要求：未经允许不得发起大规模并发测试。
+    因此这里默认拒绝 >1，必须显式传 allow_parallel=True（CLI 的 --allow-parallel）。
+    """
+    try:
+        n = int(value or 1)
+    except (TypeError, ValueError):
+        n = 1
+    if n <= 1:
+        return 1
+    if not allow_parallel:
+        raise ValueError(
+            "并发 {} 未获授权：默认只允许单局串行。".format(n) +
+            "如需并发，请显式加 --allow-parallel（或界面勾选授权），并先确认额度与限流。")
+    return n
+
+
 def build_conditions(sweep: dict) -> list:
     if not sweep:
         return [{}]
