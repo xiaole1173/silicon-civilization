@@ -54,3 +54,8 @@ docs/homepage-*.png
 _pw*/
 _pwt*/
 _pwZ*/
+
+# 浏览器 profile / 临时目录（2026-10-28 误提交后加入）
+_w05_probe/
+w05_3d_game/
+_w*/
