@@ -51,6 +51,9 @@ class RulesHorrorPlugin(BaseScenario):
             return len(text or "") > int(check.get("value") or 10 ** 6)
         if kind == "must_speak":
             return not (text or "").strip()
+        if kind == "must_contain":
+            words = check.get("words") or []
+            return not any(w and w in (text or "") for w in words)
         return False
 
     def _violations(self, session, text: str) -> list:

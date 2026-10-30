@@ -18,6 +18,9 @@ from base.contracts import ContractBook  # noqa: E402
 from base.message import OBSERVER, PUBLIC, Channel, Message  # noqa: E402
 from base.streaming import Broker  # noqa: E402
 
+# 记录到每条消息 meta 里，便于复现（文档要求"记录 Harness 版本"）
+HARNESS = "silicon-base/1.0"
+
 
 @dataclass
 class Agent:
@@ -26,6 +29,7 @@ class Agent:
     name: str
     model_conf: dict
     persona: str = ""
+    role_card_version: str = ""
     channels: set = field(default_factory=set)
 
     def system_prompt(self, session) -> str:
@@ -185,7 +189,10 @@ class Session:
         msg = self.add_message(channel, agent.id, kind=kind, text="", round_id=round_id)
         started = time.time()
         meta = {"model": agent.model_conf.get("model", ""), "label": label,
-                "attempts": 0, "rejections": []}
+                "attempts": 0, "rejections": [],
+                "harness": HARNESS,
+                "role_card_version": getattr(agent, "role_card_version", "") or "",
+                "max_tokens": budget}
         if round_id:
             meta["round"] = round_id
         text, thinking = "", ""
@@ -213,6 +220,8 @@ class Session:
                                    "prompt_chars": info["prompt_chars"]})
 
                 conf = dict(agent.model_conf)
+                meta["temperature"] = (conf.get("temperature", 0.7)
+                                       if temperature is None else temperature)
                 resp = providers.call_chat(
                     conf, messages, max_tokens=budget,
                     temperature=conf.get("temperature", 0.7) if temperature is None else temperature,

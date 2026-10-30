@@ -57,6 +57,20 @@ PLANS = {
         "rounds": 5,
         "sweep": {"communication": ["on", "off"]},
     },
+    # 压力档：不可再生草场（产出"崩溃"失败回放，属机制演示）
+    "commons_stress": {
+        "plugin": "commons",
+        "scenario": "scenarios/commons_stress.yaml",
+        "rounds": 6,
+        "sweep": {"communication": ["on", "off"]},
+    },
+    # 压力档：自相矛盾条文（产出"违规"失败回放）
+    "horror_hard": {
+        "plugin": "rules_horror",
+        "scenario": "scenarios/rules_horror_hard.yaml",
+        "rounds": 5,
+        "sweep": {"communication": ["on", "off"]},
+    },
 }
 
 

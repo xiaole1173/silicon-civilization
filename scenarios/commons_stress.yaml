@@ -1,0 +1,19 @@
+# 压力档：不可再生（rho=0）+ 经典激励，用于产出"崩溃"失败回放（机制演示，不代表模型自发行为）
+name: 枯竭草场（压力档）
+players: 6
+theme:
+  name: 山坳草场
+  premise: |
+    草场今年没下雨，割掉一茬就再也长不回来了。
+    你们六户还指望它过冬。
+world:
+  resource: 草料
+  unit: 捆
+  initial: 100
+  cap: 100
+  regen_rate: 0.0
+  per_round_max: 25
+  fair_share_mode: sustainable
+incentive: classic
+rounds: 6
+declare: true

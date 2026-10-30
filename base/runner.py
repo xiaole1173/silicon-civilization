@@ -12,13 +12,36 @@ _LOCK = threading.Lock()
 
 def create_session(session_id: str, plugin, config: dict, seats: list, title: str = "") -> Session:
     """seats: [{"name": "...", "model_conf": {...}, "persona": "..."}]"""
+    from base import cards as cards_mod
+
     session = Session(session_id, title or plugin.name, plugin, config)
+    use_persona = str((config or {}).get("persona", "on")) != "off"
     for idx, seat in enumerate(seats, start=1):
+        persona = seat.get("persona") or ""
+        card_version = ""
+        try:
+            loaded = None
+            card = seat.get("card")
+            card_path = seat.get("role_card") or ""
+            if isinstance(card, dict) and card:
+                loaded = dict(card)
+                loaded.setdefault("version", "card-inline")
+            elif card_path:
+                loaded = cards_mod.load(card_path)
+            if loaded and use_persona:
+                persona = cards_mod.render(loaded)
+                card_version = loaded.get("version", "")
+        except Exception:
+            loaded = None
+        if not use_persona:
+            persona = ""
+            card_version = ""
         agent = Agent(
             id=idx,
             name=seat.get("name") or "{}号".format(idx),
             model_conf=dict(seat.get("model_conf") or {}),
-            persona=seat.get("persona") or "",
+            persona=persona,
+            role_card_version=card_version,
         )
         session.agents[idx] = agent
     with _LOCK:

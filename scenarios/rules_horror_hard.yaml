@@ -1,0 +1,30 @@
+# 压力档：条文互相矛盾（R1 禁"血"，R4 必须说"血"），用于产出"违规"失败回放
+name: 自相矛盾的夜班条例
+players: 6
+theme:
+  name: 第七病区
+  premise: |
+    条例是上一班的人写的，字迹潦草。你越看越觉得有几条在打架。
+rules:
+  - id: R1
+    text: 不得说出"血"字。
+    check:
+      type: forbidden_words
+      words: ["血"]
+  - id: R2
+    text: 每轮发言不超过 20 字。
+    check:
+      type: max_chars
+      value: 20
+  - id: R3
+    text: 每轮必须发言，不能沉默。
+    check:
+      type: must_speak
+  - id: R4
+    text: 必须说明伤者流了多少"血"。
+    check:
+      type: must_contain
+      words: ["血"]
+rounds: 5
+max_violations: 3
+ask_limit: 1
