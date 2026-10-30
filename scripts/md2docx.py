@@ -8,7 +8,42 @@ from pathlib import Path
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, RGBColor
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+
+
+def add_page_footer(section):
+    p = section.footer.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run()
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = "PAGE"
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    run._r.append(begin)
+    run._r.append(instr)
+    run._r.append(end)
+
+
+def add_toc(doc):
+    p = doc.add_paragraph()
+    run = p.add_run()
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = 'TOC \\o "1-2" \\h \\z \\u'
+    sep = OxmlElement("w:fldChar")
+    sep.set(qn("w:fldCharType"), "separate")
+    t = OxmlElement("w:t")
+    t.text = "（此处为目录域：在 Word 里全选后按 F9 或右键“更新域”即可生成）"
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    for node in (begin, instr, sep, t, end):
+        run._r.append(node)
 
 FENCE = chr(96) * 3
 BT = chr(96)
@@ -49,6 +84,10 @@ def main():
     lines = src.read_text(encoding="utf-8").splitlines()
     doc = Document()
     set_cjk_font(doc)
+    doc.core_properties.title = "硅基文明 · AI 多智能体社会实验项目方案 v2"
+    doc.core_properties.subject = "多智能体社会实验基座与实验设计"
+    doc.core_properties.author = "vibe-coding五里香"
+    add_page_footer(doc.sections[0])
     i = 0
     n = len(lines)
     while i < n:
@@ -85,7 +124,9 @@ def main():
                         add_inline(cells[j].paragraphs[0], txt)
                 doc.add_paragraph()
             continue
-        if s.startswith("### "):
+        if s.startswith("<!-- TOC -->"):
+            add_toc(doc)
+        elif s.startswith("### "):
             doc.add_heading(s[4:], level=3)
         elif s.startswith("## "):
             doc.add_heading(s[3:], level=2)
